@@ -1,0 +1,11 @@
+{
+  "name": "@form-validator-js/core",
+  "version": "0.0.1",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "../../node_modules/.bin/jest --colors"
+  },
+  "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
+  "license": "ISC"
+}
