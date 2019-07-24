@@ -1,11 +1,11 @@
-import { utilities } from '@form-validator-js/core';
+import FormValidator, { FormValidatorAnswer } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
     // eslint-disable-next-line no-param-reassign
     parameters.regExp = new RegExp(parameters.argumentString);
 
-    switch (utilities.getElementType(targetElement)) {
+    switch (FormValidator.getElementType(targetElement)) {
       case 'text':
       case 'password':
       case 'tel':
@@ -18,9 +18,9 @@ export default {
   validate(targetElement, parameters) {
     const { value } = targetElement;
 
-    return {
+    return new FormValidatorAnswer({
       isValid: value.length === 0 || parameters.regExp.test(value),
       elements: [targetElement],
-    };
+    });
   },
 };

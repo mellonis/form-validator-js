@@ -1,8 +1,8 @@
-import { FormValidatorAnswer, utilities } from '@form-validator-js/core';
+import FormValidator, { FormValidatorAnswer } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
-    const elementType = utilities.getElementType(targetElement);
+    const elementType = FormValidator.getElementType(targetElement);
 
     switch (elementType) {
       case 'checkbox':

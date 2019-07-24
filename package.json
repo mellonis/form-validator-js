@@ -5,7 +5,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "lint": "eslint",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
   "license": "ISC",
@@ -14,10 +16,13 @@
   ],
   "devDependencies": {
     "@babel/core": "^7.5.5",
+    "@babel/plugin-proposal-class-properties": "^7.5.5",
+    "@babel/plugin-proposal-private-methods": "^7.4.4",
     "@babel/preset-env": "^7.5.5",
     "@types/jest": "^24.0.15",
+    "babel-eslint": "^10.0.2",
     "babel-jest": "^24.8.0",
-    "eslint": "^6.0.1",
+    "eslint": "^6.1.0",
     "eslint-config-airbnb": "^17.1.1",
     "eslint-plugin-import": "^2.18.1",
     "jest": "^24.8.0",

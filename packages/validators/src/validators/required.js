@@ -1,9 +1,9 @@
-import { utilities } from '@form-validator-js/core';
+import FormValidator, { FormValidatorAnswer } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
     // eslint-disable-next-line no-param-reassign
-    parameters.elementType = utilities.getElementType(targetElement);
+    parameters.elementType = FormValidator.getElementType(targetElement);
 
     switch (parameters.elementType) {
       case 'text':
@@ -46,10 +46,10 @@ export default {
       // no default
     }
 
-    return {
+    return new FormValidatorAnswer({
       isContextError,
       isValid,
       elements: parameters.elementList,
-    };
+    });
   },
 };

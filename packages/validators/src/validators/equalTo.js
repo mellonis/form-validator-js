@@ -1,3 +1,5 @@
+import { FormValidatorAnswer } from '@form-validator-js/core';
+
 export default {
   init(targetElement, parameters) {
     const id = parameters.argumentString;
@@ -6,15 +8,15 @@ export default {
     parameters.otherElement = document.getElementById(id);
 
     if (parameters.otherElement == null) {
-      throw new Error(`There is no #'${id}' element`);
+      throw new Error(`There is no '#${id}' element`);
     }
 
     return [targetElement, parameters.otherElement];
   },
   validate(targetElement, parameters) {
-    return {
+    return new FormValidatorAnswer({
       isValid: targetElement.value === parameters.otherElement.value,
       elements: [targetElement],
-    };
+    });
   },
 };
