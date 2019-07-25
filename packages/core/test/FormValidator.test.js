@@ -13,7 +13,7 @@ describe('FormValidator', () => {
     expect(() => new FormValidator())
       .toThrowError('Cannot destructure property `form` of \'undefined\' or \'null\'.');
     expect(() => new FormValidator({}))
-      .toThrowError('form should be an HTMLFormElement');
+      .toThrowError('form must be an HTMLFormElement');
     expect(() => new FormValidator({ form }))
       .not
       .toThrowError();
@@ -91,5 +91,80 @@ describe('FormValidator.addValidator', () => {
       });
     })
       .toThrowError('Invalid validator declaration');
+  });
+});
+
+describe('FormValidator.createValidateEvent', () => {
+  test('event is defined', () => {
+    const event = FormValidator.createValidateEvent();
+
+    expect(event)
+      .toBeDefined();
+  });
+
+  test('event type is validate', () => {
+    const event = FormValidator.createValidateEvent();
+
+    expect(event.type)
+      .toBe('validate');
+  });
+});
+
+describe('FormValidator.getValidatorNameToArgumentStringMap', () => {
+  let formValidator;
+
+  beforeAll(() => {
+    formValidator = new FormValidator({
+      form: document.createElement('form'),
+      validatorDeclarations: {
+        a: {},
+        b: {},
+        c: {},
+        d: {},
+      },
+    });
+  });
+
+  const testCaseList = [
+    [
+      'z',
+      [],
+    ],
+    [
+      'a,b,c,d',
+      [
+        ['a', ''],
+        ['b', ''],
+        ['c', ''],
+        ['d', ''],
+      ],
+    ],
+    [
+      'a(1),b,q',
+      [
+        ['a', '1'],
+        ['b', ''],
+      ],
+    ],
+    [
+      'a((1)))(),b(())',
+      [
+        ['a', '(1)))('],
+        ['b', '()'],
+      ],
+    ],
+  ];
+
+  testCaseList.forEach(([dataValidationAttribute, validMapEntrinesAsList]) => {
+    test(`validatorNameToArgumentStringMap for '${dataValidationAttribute}'`, () => {
+      expect(
+        Array.from(
+          formValidator
+            .getValidatorNameToArgumentStringMap({ value: dataValidationAttribute })
+            .entries(),
+        ),
+      )
+        .toEqual(validMapEntrinesAsList);
+    });
   });
 });

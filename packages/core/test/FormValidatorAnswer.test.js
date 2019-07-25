@@ -1,58 +1,58 @@
-import { FormValidatorAnswer } from '../src';
+import { FormValidatorValidationResult } from '../src';
 
-describe('FormValidatorAnswer', () => {
+describe('FormValidatorValidationResult', () => {
   test('constructor', () => {
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
     }).validatorName)
       .toEqual('test');
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
     }).isContextError)
       .toEqual(false);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
       isContextError: false,
     }).isContextError)
       .toEqual(false);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
       isContextError: true,
     }).isContextError)
       .toEqual(true);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
     }).isValid)
       .toEqual(true);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
       isValid: false,
     }).isValid)
       .toEqual(false);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
       isValid: true,
     }).isValid)
       .toEqual(true);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
     }).validatorSubtypeList)
       .toEqual([]);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
       validatorSubtypeList: [],
     }).validatorSubtypeList)
       .toEqual([]);
 
-    expect(new FormValidatorAnswer({
+    expect(new FormValidatorValidationResult({
       validatorName: 'test',
       validatorSubtypeList: ['subtype1', 'subtype2'],
     }).validatorSubtypeList)
@@ -60,7 +60,7 @@ describe('FormValidatorAnswer', () => {
   });
 
   test('immutability', () => {
-    const formValidatorAnswer = new FormValidatorAnswer({
+    const formValidatorAnswer = new FormValidatorValidationResult({
       validatorName: 'test',
     });
 

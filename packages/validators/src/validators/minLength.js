@@ -1,4 +1,4 @@
-import FormValidator, { FormValidatorAnswer } from '@form-validator-js/core';
+import FormValidator, { FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
@@ -20,7 +20,7 @@ export default {
     }
   },
   validate(targetElement, parameters) {
-    return new FormValidatorAnswer({
+    return new FormValidatorValidationResult({
       isValid: targetElement.value.length >= parameters.minLength,
       elements: [targetElement],
     });

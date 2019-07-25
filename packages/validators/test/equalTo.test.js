@@ -1,8 +1,8 @@
 import FormValidator from '@form-validator-js/core';
 import validators from '@form-validator-js/validators';
 
-describe('init', () => {
-  test('main', () => {
+describe('equalTo.init', () => {
+  test('valid parameters', () => {
     document.body.innerHTML = `<form id="attrs-test">
   <input type="text" id="that" name="equal-to" data-validation="equal-to(other)">
   <input type="text" id="other">
@@ -34,7 +34,7 @@ describe('init', () => {
     expect(equalToMock.init.mock.results[0].value)
       .toEqual([that, other]);
   });
-  test('wrong id', () => {
+  test('invalid parameters', () => {
     document.body.innerHTML = `<form id="attrs-test">
   <input type="text" id="that" name="equal-to" data-validation="equal-to(other)">
   <input type="text" id="notother">
@@ -54,8 +54,8 @@ describe('init', () => {
   });
 });
 
-describe('validate', () => {
-  test('main', () => {
+describe('equalTo.validate', () => {
+  test('validator called', () => {
     document.body.innerHTML = `<form id="attrs-test">
     <input type="text" id="that" name="equal-to" data-validation="equal-to(other)">
     <input type="text" id="other">

@@ -1,4 +1,4 @@
-import { FormValidatorAnswer } from '@form-validator-js/core';
+import { FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
@@ -14,7 +14,7 @@ export default {
     return [targetElement, parameters.otherElement];
   },
   validate(targetElement, parameters) {
-    return new FormValidatorAnswer({
+    return new FormValidatorValidationResult({
       isValid: targetElement.value === parameters.otherElement.value,
       elements: [targetElement],
     });

@@ -1,4 +1,4 @@
-import FormValidator, { FormValidatorAnswer } from '@form-validator-js/core';
+import FormValidator, { FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
@@ -18,7 +18,7 @@ export default {
   validate(targetElement, parameters) {
     const { value } = targetElement;
 
-    return new FormValidatorAnswer({
+    return new FormValidatorValidationResult({
       isValid: value.length === 0 || parameters.regExp.test(value),
       elements: [targetElement],
     });

@@ -1,7 +1,7 @@
 import FormValidator from '@form-validator-js/core';
 import validators from '@form-validator-js/validators';
 
-describe('init', () => {
+describe('required.init', () => {
   test('text input', () => {
     document.body.innerHTML = `<form id="attrs-test">
   <input type="text" id="that" data-validation="required">
@@ -66,7 +66,7 @@ describe('init', () => {
       .toEqual([that, other]);
   });
 
-  test('unsupported type', () => {
+  test('invalid element type', () => {
     document.body.innerHTML = `<form id="attrs-test">
   <div data-validation="required">
   </form>`;
@@ -85,8 +85,8 @@ describe('init', () => {
   });
 });
 
-describe('validate', () => {
-  test('text input', () => {
+describe('required.validate', () => {
+  test('input type = text', () => {
     document.body.innerHTML = `<form id="attrs-test">
   <input type="text" id="that" name="equal-to" data-validation="required">
   </form>`;
@@ -119,7 +119,7 @@ describe('validate', () => {
       .toEqual([false, true, false]);
   });
 
-  test('checkbox input', () => {
+  test('input type = checkbox', () => {
     document.body.innerHTML = `<form id="attrs-test">
   <input type="checkbox" id="that" name="required" data-validation="required">
   <input type="checkbox" id="other" name="required">

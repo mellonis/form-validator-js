@@ -1,4 +1,4 @@
-import FormValidator, { FormValidatorAnswer } from '@form-validator-js/core';
+import FormValidator, { FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
@@ -54,7 +54,7 @@ export default {
   validate(targetElement, parameters) {
     const checkedCount = parameters.elementList.filter(element => element.checked).length;
 
-    return new FormValidatorAnswer({
+    return new FormValidatorValidationResult({
       validatorName: 'checked-count',
       isContextError: true,
       isValid: parameters.minCount <= checkedCount && checkedCount <= parameters.maxCount,

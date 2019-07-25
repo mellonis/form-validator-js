@@ -7,10 +7,10 @@
  */
 
 /**
- * @class FormValidatorAnswer
+ * @class FormValidatorValidationResult
  * @param {FormValidatorAnswerParams_t} params
  */
-export default class FormValidatorAnswer {
+export default class FormValidatorValidationResult {
   constructor({
     validatorName = '',
     validatorSubtypeList = [],

@@ -1,4 +1,4 @@
-import FormValidatorAnswer from './FormValidatorAnswer';
+import FormValidatorValidationResult from './FormValidatorValidationResult';
 
 /**
  * @typedef {Array.<(HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement)>} ValidatorInitResult_t
@@ -15,7 +15,7 @@ import FormValidatorAnswer from './FormValidatorAnswer';
  * @typedef {Function} ValidatorValidateFunction_t
  * @param {(HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement)} targetElement
  * @param {Object.<string,*>} parameters *
- * @returns {FormValidatorAnswer}
+ * @returns {FormValidatorValidationResult}
  */
 
 /**
@@ -40,40 +40,35 @@ import FormValidatorAnswer from './FormValidatorAnswer';
  * @param {FormValidatorParams_t} params
  */
 export default class FormValidator {
-  #form;
-
-  #onValidate;
-
-  #validatorNameToDefinitionMap;
-
   ignoreValidationResult = false;
-
-  #contextElementToContextMap;
-
-  #targetToStorageMap;
-
-  #observableToTargetSetMap;
 
   #elementToErrorListMap;
 
+  #form;
+
+  #contextElementToContextMap = new Map();
+
+  #observableToTargetSetMap;
+
+  #onValidate;
+
+  #targetElementToStorageMap;
+
+  #validatorNameToDefinitionMap = new Map();
+
   constructor({ form, validatorDeclarations = {}, onValidate = () => {} }) {
     if (!(form instanceof HTMLFormElement)) {
-      throw new Error('form should be an HTMLFormElement');
+      throw new Error('form must be an HTMLFormElement');
     }
 
     this.#form = form;
     this.#onValidate = onValidate;
-    this.#validatorNameToDefinitionMap = new Map();
-    this.ignoreValidationResult = false;
-    this.#contextElementToContextMap = new Map();
-    this.#targetToStorageMap = null;
-    this.#observableToTargetSetMap = null;
-    this.#elementToErrorListMap = null;
     this.#form.setAttribute('novalidate', '');
     this.#form.setAttribute('data-validation-context', '*');
     this.addValidators(validatorDeclarations);
-    this.#form.addEventListener('validate', this.#validateHandler.bind(this));
-    this.#form.addEventListener('input', this.#changeHandler.bind(this));
+    this.#form.addEventListener('input', this.#inputEventHandler.bind(this));
+    this.#form.addEventListener('reset', this.#resetEventHandler.bind(this));
+    this.#form.addEventListener('validate', this.#validateEventHandler.bind(this));
   }
 
   static getElementType(element) {
@@ -116,10 +111,11 @@ export default class FormValidator {
   addValidators(validatorDeclarations) {
     Object.keys(validatorDeclarations)
       .forEach((key) => {
+        const validatorDeclaration = validatorDeclarations[key] || {};
         const {
           init = element => [element],
           validate = () => ({ isValid: true }),
-        } = validatorDeclarations[key];
+        } = validatorDeclaration;
 
         if (typeof init !== 'function' || typeof validate !== 'function') {
           throw new Error('Invalid validator declaration');
@@ -127,7 +123,7 @@ export default class FormValidator {
 
         let {
           errorMessage = '',
-        } = validatorDeclarations[key];
+        } = validatorDeclaration;
 
         if (typeof errorMessage === 'string') {
           errorMessage = {
@@ -141,14 +137,15 @@ export default class FormValidator {
           errorMessage,
         });
       });
-    this.#init();
+
+    this.updateValidationParameters();
 
     return this;
   }
 
   getValidatorNameToArgumentStringMap({ value = '' }) {
     const regExp = /([a-z0-9-_]+)(?:\((.*?)\)(?=[;, ]+))?/gi;
-    const result = new Map();
+    const validatorNameToArgumentStringMap = new Map();
 
     let normalizedValue = value;
 
@@ -174,52 +171,57 @@ export default class FormValidator {
     Object.keys(validatorParameters)
       .filter(validatorName => this.#validatorNameToDefinitionMap.has(validatorName))
       .sort((a, b) => validatorParameters[a].ix - validatorParameters[b].ix)
-      .forEach(validatorName => result.set(validatorName, validatorParameters[validatorName].argumentString || ''));
+      .forEach(validatorName => validatorNameToArgumentStringMap.set(validatorName, validatorParameters[validatorName].argumentString || ''));
 
-    return result;
+    return validatorNameToArgumentStringMap;
   }
 
   updateValidationParameters() {
+    this.#targetElementToStorageMap = new Map();
+    this.#elementToErrorListMap = new Map();
+    this.#observableToTargetSetMap = new Map();
+    this.#buildContextTree(this.#form);
     this.#form.querySelectorAll('[data-validation]')
-      .forEach((target) => {
-        this.#elementToErrorListMap.set(target, []);
+      .forEach((targetElement) => {
+        this.#elementToErrorListMap.set(targetElement, []);
 
         const {
           validatorNameToContextMap,
           validatorNameToDataMap,
-        } = this.#getData(target);
-        const validatorNameToArgumentStringMap = this.getValidatorNameToArgumentStringMap(target.attributes['data-validation']);
+        } = this.#getData(targetElement);
+        const validatorNameToArgumentStringMap = this.getValidatorNameToArgumentStringMap(targetElement.attributes['data-validation']);
 
-        validatorNameToArgumentStringMap.forEach((argumentString, validatorName) => {
-          validatorNameToContextMap
-            .set(validatorName, this.#getContext(target, validatorName));
-          validatorNameToDataMap
-            .set(validatorName, { argumentString });
-        });
+        validatorNameToArgumentStringMap
+          .forEach((argumentString, validatorName) => {
+            validatorNameToContextMap
+              .set(validatorName, this.#getContext(targetElement, validatorName));
+            validatorNameToDataMap
+              .set(validatorName, { argumentString });
+          });
 
         Array.from(validatorNameToArgumentStringMap.keys())
           .forEach((validatorNameToExecute) => {
             this.#validatorNameToDefinitionMap.get(validatorNameToExecute)
               .init
               .apply(null, [
-                target,
+                targetElement,
                 validatorNameToDataMap.get(validatorNameToExecute),
               ])
-              .filter(observable => observable !== target)
-              .forEach(observable => this.#addObservableElement(target, observable));
+              .filter(observable => observable !== targetElement)
+              .forEach(observable => this.#addObservableElement(targetElement, observable));
           });
       });
   }
 
-  #addError(element, answer) {
-    this.#removeError(element, answer);
+  #addError(element, validationResult) {
+    this.#removeError(element, validationResult);
     const errorList = this.#elementToErrorListMap.get(element);
     const {
       validatorName,
-    } = answer;
+    } = validationResult;
     let {
       validatorSubtypeList,
-    } = answer;
+    } = validationResult;
 
     if (validatorSubtypeList.length === 0) {
       validatorSubtypeList = [''];
@@ -228,10 +230,7 @@ export default class FormValidator {
     validatorSubtypeList.map(subtype => errorList.push({
       validatorName,
       subtype,
-      message: (
-        this.#validatorNameToDefinitionMap.get(validatorName).errorMessage
-        || {}
-      )[subtype] || null,
+      message: this.#validatorNameToDefinitionMap.get(validatorName).errorMessage[subtype] || null,
     }));
   }
 
@@ -264,34 +263,25 @@ export default class FormValidator {
     return context;
   }
 
-  #changeHandler(event) {
-    const { target } = event;
+  #initData(targetElement) {
+    this.#targetElementToStorageMap.set(targetElement, {
+      validatorNameToContextMap: new Map(),
+      validatorNameToDataMap: new Map(),
+    });
+  }
 
-    if (this.#targetToStorageMap.has(target)) {
-      target.dispatchEvent(FormValidator.createValidateEvent());
+  #inputEventHandler(event) {
+    const { target: targetElement } = event;
+
+    if (this.#targetElementToStorageMap.has(targetElement)) {
+      targetElement.dispatchEvent(FormValidator.createValidateEvent());
     }
 
-    if (this.#observableToTargetSetMap.has(target)) {
-      this.#observableToTargetSetMap.get(target)
+    if (this.#observableToTargetSetMap.has(targetElement)) {
+      this.#observableToTargetSetMap.get(targetElement)
         .forEach((observer) => {
           observer.dispatchEvent(FormValidator.createValidateEvent());
         });
-    }
-  }
-
-  #clearElementsErrorLists() {
-    this.#elementToErrorListMap = new Map();
-  }
-
-  #clearObservables() {
-    this.#observableToTargetSetMap = new Map();
-  }
-
-  #clearTargetsData(target) {
-    if (target) {
-      this.#setData(target);
-    } else {
-      this.#targetToStorageMap = new Map();
     }
   }
 
@@ -311,116 +301,104 @@ export default class FormValidator {
     return context;
   }
 
-  #getData(target) {
-    if (!this.#hasData(target)) {
-      this.#setData(target);
+  #getData(targetElement) {
+    if (!this.#hasData(targetElement)) {
+      this.#initData(targetElement);
     }
 
-    return this.#targetToStorageMap.get(target);
+    return this.#targetElementToStorageMap.get(targetElement);
   }
 
-  #hasData(target) {
-    return this.#targetToStorageMap.has(target);
+  #hasData(targetElement) {
+    return this.#targetElementToStorageMap.has(targetElement);
   }
 
-  #init() {
-    this.#clearTargetsData();
-    this.#clearElementsErrorLists();
-    this.#clearObservables();
-    this.#buildContextTree(this.#form);
-    this.updateValidationParameters();
-  }
-
-  #removeError(element, answer) {
+  #removeError(element, validationResult) {
     let errorList = this.#elementToErrorListMap.get(element);
 
-    errorList = errorList.filter(error => error.validatorName !== answer.validatorName);
+    errorList = errorList.filter(error => error.validatorName !== validationResult.validatorName);
 
     this.#elementToErrorListMap.set(element, errorList);
   }
 
-  #setData(target) {
-    this.#targetToStorageMap.set(target, {
-      validatorNameToContextMap: new Map(),
-      validatorNameToDataMap: new Map(),
-    });
+  #resetEventHandler(event) {
+    if (event.target === this.#form) {
+      [...this.#elementToErrorListMap.keys()]
+        .forEach((element) => this.#onValidate(element, []));
+    }
   }
 
-  #validateHandler(event) {
-    const { target } = event;
-    const elementType = FormValidator.getElementType(target);
+  #validateEventHandler(event) {
+    const { target: targetElement } = event;
+    const elementType = FormValidator.getElementType(targetElement);
 
     if (elementType) {
-      const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(target);
-      const answerList = Array.from(validatorNameToContextMap)
+      const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(targetElement);
+      const validationResultList = Array.from(validatorNameToContextMap)
         .map(([validatorName]) => {
           const data = validatorNameToDataMap.get(validatorName);
-          const answer = this.#validatorNameToDefinitionMap.get(validatorName)
+          const validationResult = this.#validatorNameToDefinitionMap.get(validatorName)
             .validate
             .apply(null, [
-              target,
+              targetElement,
               data,
             ]);
 
-          if (!(answer instanceof FormValidatorAnswer)) {
-            throw new Error('Invalid validator answer');
+          if (!(validationResult instanceof FormValidatorValidationResult)) {
+            throw new Error('Invalid validation result');
           }
 
-          answer.validatorName = validatorName;
+          validationResult.validatorName = validatorName;
 
           if (this.ignoreValidationResult) {
-            return new FormValidatorAnswer({
-              ...answer,
+            return new FormValidatorValidationResult({
+              ...validationResult,
               isValid: true,
             });
           }
 
-          return answer;
+          return validationResult;
         });
 
-      const { contextElementSet, controlSet } = answerList.reduce((result, answer) => {
+      const elementSet = validationResultList.reduce((elementSet, validationResult) => {
         const {
           isContextError,
           isValid,
           validatorName,
-        } = answer;
+        } = validationResult;
 
         if (isContextError) {
-          const context = this.#getContext(target, validatorName);
+          const context = this.#getContext(targetElement, validatorName);
 
           if (isValid) {
-            this.#removeError(context.element, answer);
+            this.#removeError(context.element, validationResult);
           } else {
-            this.#addError(context.element, answer);
+            this.#addError(context.element, validationResult);
           }
 
-          result.contextElementSet.add(context.element);
+          elementSet.add(context.element);
         } else {
           if (isValid) {
-            this.#removeError(target, answer);
+            this.#removeError(targetElement, validationResult);
           } else {
-            this.#addError(target, answer);
+            this.#addError(targetElement, validationResult);
           }
 
-          result.controlSet.add(target);
+          elementSet.add(targetElement);
         }
 
-        return result;
-      }, {
-        contextElementSet: new Set(),
-        controlSet: new Set(),
-      });
+        return elementSet;
+      }, new Set());
 
-      contextElementSet.forEach((contextElement) => {
-        this.#onValidate(contextElement, this.#elementToErrorListMap.get(contextElement)
-          .map(error => error.message)
-          .filter(message => message && message && message.length > 0));
-      });
-      controlSet.forEach((controlElement) => {
-        this.#onValidate(controlElement, this.#elementToErrorListMap.get(controlElement)
-          .map(error => error.message)
-          .filter(message => message && message.length > 0));
-      });
+
+      [...elementSet]
+        .forEach((element) => {
+          const errorMessageList = this.#elementToErrorListMap.get(element)
+            .map(error => error.message)
+            .filter(message => message && message.length > 0);
+
+          this.#onValidate(element, errorMessageList);
+        });
     }
 
     event.stopPropagation();

@@ -1,4 +1,4 @@
-import FormValidator, { FormValidatorAnswer } from '@form-validator-js/core';
+import FormValidator, { FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
   init(targetElement, parameters) {
@@ -46,7 +46,7 @@ export default {
       // no default
     }
 
-    return new FormValidatorAnswer({
+    return new FormValidatorValidationResult({
       isContextError,
       isValid,
       elements: parameters.elementList,

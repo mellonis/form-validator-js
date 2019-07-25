@@ -1,4 +1,4 @@
 import FormValidator from './classes/FormValidator';
-import FormValidatorAnswer from './classes/FormValidatorAnswer';
+import FormValidatorValidationResult from './classes/FormValidatorValidationResult';
 
-export { FormValidator as default, FormValidatorAnswer };
+export { FormValidator as default, FormValidatorValidationResult };
