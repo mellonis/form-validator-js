@@ -350,4 +350,37 @@ describe('FormValidator validations', () => {
     )
       .toEqual(['c - subtype message']);
   });
+
+  test('specific errorMessage for an element', () => {
+    const formValidator = new FormValidator({
+      form,
+      ...formValidatorParams,
+      onErrorMessageListChanged: onErrorMessageListChangedMock,
+    });
+
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    formValidator.elementToSpecificErrorMessageMap.set(input, {
+      a: 'aa',
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    formValidator.elementToSpecificErrorMessageMap.delete(input);
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    formValidator.elementToSpecificErrorMessageMap.set(input, {
+      a: 'aaa',
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    formValidator.elementToSpecificErrorMessageMap.clear();
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(
+      onErrorMessageListChangedMock.mock.calls
+        .filter(call => call[0] === input).length,
+    )
+      .toBe(5);
+    expect(
+      onErrorMessageListChangedMock.mock.calls
+        .filter(call => call[0] === input)
+        .flatMap(call => call[1]),
+    )
+      .toEqual(['a', 'aa', 'a', 'aaa', 'a']);
+  });
 });

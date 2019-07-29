@@ -45,6 +45,10 @@ export default class FormValidator {
 
   #elementToErrorListMap;
 
+  #elementToSpecificErrorMessageMap = new Map();
+
+  #elementToSpecificErrorMessageMapFacade = {};
+
   #form;
 
   #contextElementToContextMap = new Map();
@@ -75,6 +79,44 @@ export default class FormValidator {
     this.#form.addEventListener('input', this.#inputEventHandler.bind(this));
     this.#form.addEventListener('reset', this.#resetEventHandler.bind(this));
     this.#form.addEventListener('validate', this.#validateEventHandler.bind(this));
+
+    Object.defineProperties(this.#elementToSpecificErrorMessageMapFacade, {
+      set: {
+        enumerable: true,
+        value: (element, errorMessage) => {
+          if (errorMessage && Object.prototype.toString.call(errorMessage) === '[object Object]') {
+            const qq = {};
+
+            Object.keys(errorMessage)
+              .filter(validatorName => this.#validatorNameToDefinitionMap.has(validatorName))
+              .forEach(validatorName => {
+                qq[validatorName] = FormValidator.#getErrorMessageFromDeclaration(errorMessage[validatorName]);
+              });
+
+            this.#elementToSpecificErrorMessageMap.set(element, qq);
+          }
+        },
+      },
+      delete: {
+        enumerable: true,
+        value: (element) => {
+          this.#elementToSpecificErrorMessageMap.delete(element);
+        },
+      },
+      clear: {
+        enumerable: true,
+        value: () => {
+          this.#elementToSpecificErrorMessageMap.clear();
+        },
+      },
+    });
+
+    Object.defineProperty(this, 'elementToSpecificErrorMessageMap', {
+      enumerable: true,
+      get() {
+        return this.#elementToSpecificErrorMessageMapFacade;
+      },
+    })
   }
 
   static getElementType(element) {
@@ -120,6 +162,16 @@ export default class FormValidator {
       .filter(message => message && message.length > 0);
   }
 
+  static #getErrorMessageFromDeclaration(errorMessage = '') {
+    if (typeof errorMessage === 'string') {
+      errorMessage = {
+        '': errorMessage,
+      };
+    }
+
+    return errorMessage;
+  }
+
   addValidators(validatorDeclarations) {
     Object.keys(validatorDeclarations)
       .forEach((key) => {
@@ -137,15 +189,7 @@ export default class FormValidator {
           throw new Error('Invalid validator declaration');
         }
 
-        let {
-          errorMessage = '',
-        } = validatorDeclaration;
-
-        if (typeof errorMessage === 'string') {
-          errorMessage = {
-            '': errorMessage,
-          };
-        }
+        const errorMessage = FormValidator.#getErrorMessageFromDeclaration(validatorDeclaration.errorMessage);
 
         this.#validatorNameToDefinitionMap.set(key, {
           init,
@@ -249,7 +293,10 @@ export default class FormValidator {
     validatorSubtypeList.map(subtype => errorList.push({
       validatorName,
       subtype,
-      message: this.#validatorNameToDefinitionMap.get(validatorName).errorMessage[subtype] || null,
+      message: {
+        ...this.#validatorNameToDefinitionMap.get(validatorName).errorMessage,
+        ...((this.#elementToSpecificErrorMessageMap.get(element) || {})[validatorName] || {}),
+      }[subtype] || null,
     }));
   }
 

@@ -3,9 +3,9 @@ import { required, pattern, checkedCount } from '@form-validator-js/validators';
 import '../css/index.scss';
 import render from './errorMessageListRender';
 
-const form1 = document.getElementById('form-1');
+const form = document.getElementById('form-1');
 const formValidator = new FormValidator({
-  form: form1,
+  form,
   onErrorMessageListChanged: render,
 });
 
@@ -24,7 +24,14 @@ formValidator.addValidators({
   },
 });
 
-form1.addEventListener('submit', (event) => {
+const input = form.querySelector('input[type="text"]');
+
+formValidator.elementToSpecificErrorMessageMap.set(input, {
+  required: 'This text field must be filled with data',
+  pattern: 'put \'aaabbb\' string in this field',
+});
+
+form.addEventListener('submit', (event) => {
   console.warn(event);
   event.preventDefault();
 });
