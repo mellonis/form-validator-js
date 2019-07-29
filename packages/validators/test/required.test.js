@@ -1,5 +1,5 @@
 import FormValidator from '@form-validator-js/core';
-import validators from '@form-validator-js/validators';
+import { required } from '@form-validator-js/validators';
 
 describe('required.init', () => {
   test('text input', () => {
@@ -9,8 +9,8 @@ describe('required.init', () => {
 
     const form = document.getElementById('attrs-test');
     const requiredMock = {
-      init: jest.fn(validators.required.init),
-      validate: jest.fn(validators.required.validate),
+      init: jest.fn(required.init),
+      validate: jest.fn(required.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -29,7 +29,7 @@ describe('required.init', () => {
       .toBe(1);
     expect(requiredMock.init.mock.calls[0][0])
       .toBe(that);
-    expect(requiredMock.init.mock.results[0].value)
+    expect(requiredMock.init.mock.results[0].value.observableElementList)
       .toEqual([that]);
   });
 
@@ -41,8 +41,8 @@ describe('required.init', () => {
 
     const form = document.getElementById('attrs-test');
     const requiredMock = {
-      init: jest.fn(validators.required.init),
-      validate: jest.fn(validators.required.validate),
+      init: jest.fn(required.init),
+      validate: jest.fn(required.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -62,7 +62,7 @@ describe('required.init', () => {
       .toBe(1);
     expect(requiredMock.init.mock.calls[0][0])
       .toBe(that);
-    expect(requiredMock.init.mock.results[0].value)
+    expect(requiredMock.init.mock.results[0].value.observableElementList)
       .toEqual([that, other]);
   });
 
@@ -78,10 +78,13 @@ describe('required.init', () => {
       new FormValidator({
         form,
         validatorDeclarations: {
-          required: validators.required,
+          required: {
+            ...required,
+          },
         },
       });
-    }).toThrowError();
+    })
+      .toThrowError();
   });
 });
 
@@ -93,8 +96,8 @@ describe('required.validate', () => {
 
     const form = document.getElementById('attrs-test');
     const requiredMock = {
-      init: jest.fn(validators.required.init),
-      validate: jest.fn(validators.required.validate),
+      init: jest.fn(required.init),
+      validate: jest.fn(required.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -127,8 +130,8 @@ describe('required.validate', () => {
 
     const form = document.getElementById('attrs-test');
     const requiredMock = {
-      init: jest.fn(validators.required.init),
-      validate: jest.fn(validators.required.validate),
+      init: jest.fn(required.init),
+      validate: jest.fn(required.validate),
     };
 
     // eslint-disable-next-line no-new

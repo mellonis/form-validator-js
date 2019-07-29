@@ -1,5 +1,5 @@
 import FormValidator from '@form-validator-js/core';
-import validators from '@form-validator-js/validators';
+import { pattern } from '@form-validator-js/validators';
 
 const validParametersList = [
   ['^a{3}b{3}$', [
@@ -36,8 +36,8 @@ describe('pattern.init', () => {
 
       const form = document.getElementById('attrs-test');
       const patternMock = {
-        init: jest.fn(validators.pattern.init),
-        validate: jest.fn(validators.pattern.validate),
+        init: jest.fn(pattern.init),
+        validate: jest.fn(pattern.validate),
       };
       const input = form.querySelector('input');
 
@@ -51,12 +51,16 @@ describe('pattern.init', () => {
         },
       });
 
-      expect(patternMock.init.mock.calls.length).toBe(1);
-      expect(patternMock.init.mock.calls[0][0]).toBe(input);
-      expect(patternMock.init.mock.results[0].value).toEqual([input]);
+      expect(patternMock.init.mock.calls.length)
+        .toBe(1);
+      expect(patternMock.init.mock.calls[0][0])
+        .toBe(input);
+      expect(patternMock.init.mock.results[0].value.observableElementList)
+        .toEqual([input]);
       expect(
         testCaseList
-          .map(testCase => patternMock.init.mock.calls[0][1].regExp.test(testCase[0])),
+          .map(testCase => patternMock.init.mock.results[0].value.extraData.regExp
+            .test(testCase[0])),
       )
         .toEqual(testCaseList.map(testCase => testCase[1]));
     });
@@ -75,11 +79,12 @@ describe('pattern.init', () => {
         form,
         validatorDeclarations: {
           pattern: {
-            ...validators.pattern,
+            ...pattern,
           },
         },
       });
-    }).toThrowError('Unsupported element type');
+    })
+      .toThrowError('Unsupported element type');
   });
 });
 
@@ -92,8 +97,8 @@ describe('pattern.validate', () => {
 
       const form = document.getElementById('attrs-test');
       const patternMock = {
-        init: jest.fn(validators.pattern.init),
-        validate: jest.fn(validators.pattern.validate),
+        init: jest.fn(pattern.init),
+        validate: jest.fn(pattern.validate),
       };
       const input = form.querySelector('input');
 

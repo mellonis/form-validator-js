@@ -1,5 +1,5 @@
 import FormValidator from '@form-validator-js/core';
-import validators from '@form-validator-js/validators';
+import { minLength } from '@form-validator-js/validators';
 
 describe('minLength.init', () => {
   const validParametersList = [
@@ -22,8 +22,8 @@ describe('minLength.init', () => {
 
       const form = document.getElementById('attrs-test');
       const minLengthMock = {
-        init: jest.fn(validators.minLength.init),
-        validate: jest.fn(validators.minLength.validate),
+        init: jest.fn(minLength.init),
+        validate: jest.fn(minLength.validate),
       };
       const input = form.querySelector('input');
 
@@ -37,12 +37,16 @@ describe('minLength.init', () => {
         },
       });
 
-      expect(minLengthMock.init.mock.calls.length).toBe(1);
-      expect(minLengthMock.init.mock.calls[0][0]).toBe(input);
-      expect(minLengthMock.init.mock.results[0].value).toEqual([input]);
+      expect(minLengthMock.init.mock.calls.length)
+        .toBe(1);
+      expect(minLengthMock.init.mock.calls[0][0])
+        .toBe(input);
+      expect(minLengthMock.init.mock.results[0].value.observableElementList)
+        .toEqual([input]);
       expect({
-        minLength: minLengthMock.init.mock.calls[0][1].minLength,
-      }).toEqual(validResult);
+        minLength: minLengthMock.init.mock.results[0].value.extraData.minLength,
+      })
+        .toEqual(validResult);
     });
   });
 
@@ -64,11 +68,12 @@ describe('minLength.init', () => {
           form,
           validatorDeclarations: {
             'min-length': {
-              ...validators.minLength,
+              ...minLength,
             },
           },
         });
-      }).toThrowError('Invalid validator arguments');
+      })
+        .toThrowError('Invalid validator arguments');
     });
   });
 
@@ -85,25 +90,26 @@ describe('minLength.init', () => {
         form,
         validatorDeclarations: {
           'min-length': {
-            ...validators.minLength,
+            ...minLength,
           },
         },
       });
-    }).toThrowError('Unsupported element type');
+    })
+      .toThrowError('Unsupported element type');
   });
 });
 
 describe('minLength.validate', () => {
   test('validator called', () => {
-    const minLength = 3;
+    const minLengthValue = 3;
 
     document.body.innerHTML = `<form id="attrs-test">    
-    <input type="text" data-validation="min-length(${minLength})">
+    <input type="text" data-validation="min-length(${minLengthValue})">
     </form>`;
     const form = document.getElementById('attrs-test');
     const minLengthMock = {
-      init: jest.fn(validators.minLength.init),
-      validate: jest.fn(validators.minLength.validate),
+      init: jest.fn(minLength.init),
+      validate: jest.fn(minLength.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -122,7 +128,7 @@ describe('minLength.validate', () => {
       input.value = value;
       input.dispatchEvent(new Event('input', { bubbles: true }));
 
-      return value.length >= minLength;
+      return value.length >= minLengthValue;
     });
 
     expect(minLengthMock.validate.mock.results.map(result => result.value.isValid))

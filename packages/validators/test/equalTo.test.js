@@ -1,5 +1,5 @@
 import FormValidator from '@form-validator-js/core';
-import validators from '@form-validator-js/validators';
+import { equalTo } from '@form-validator-js/validators';
 
 describe('equalTo.init', () => {
   test('valid parameters', () => {
@@ -10,8 +10,8 @@ describe('equalTo.init', () => {
 
     const form = document.getElementById('attrs-test');
     const equalToMock = {
-      init: jest.fn(validators.equalTo.init),
-      validate: jest.fn(validators.equalTo.validate),
+      init: jest.fn(equalTo.init),
+      validate: jest.fn(equalTo.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -31,7 +31,7 @@ describe('equalTo.init', () => {
       .toBe(1);
     expect(equalToMock.init.mock.calls[0][0])
       .toBe(that);
-    expect(equalToMock.init.mock.results[0].value)
+    expect(equalToMock.init.mock.results[0].value.observableElementList)
       .toEqual([that, other]);
   });
   test('invalid parameters', () => {
@@ -47,10 +47,11 @@ describe('equalTo.init', () => {
       new FormValidator({
         form,
         validatorDeclarations: {
-          'equal-to': validators.equalTo,
+          'equal-to': equalTo,
         },
       });
-    }).toThrowError('There is no \'#other\' element');
+    })
+      .toThrowError('There is no \'#other\' element');
   });
 });
 
@@ -63,8 +64,8 @@ describe('equalTo.validate', () => {
 
     const form = document.getElementById('attrs-test');
     const equalToMock = {
-      init: jest.fn(validators.equalTo.init),
-      validate: jest.fn(validators.equalTo.validate),
+      init: jest.fn(equalTo.init),
+      validate: jest.fn(equalTo.validate),
     };
 
     // eslint-disable-next-line no-new

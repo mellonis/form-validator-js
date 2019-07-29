@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Form Validator Demo Page</title>
+    <script src="bundle.js" defer></script>
+</head>
+<body>
+<form id="form-1">
+    <input type="text" data-validation="required, pattern(^aaa.*bbb$)">
+    <div data-validation-context="checked-count">
+        <input type="checkbox" name="checkbox-name" data-validation="required,checked-count(,2)">
+        <input type="checkbox" name="checkbox-name">
+        <input type="checkbox" name="checkbox-name">
+        <input type="checkbox" name="checkbox-name">
+    </div>
+</form>
+</body>
+</html>

@@ -1,21 +1,24 @@
-import { FormValidatorValidationResult } from '@form-validator-js/core';
+import { FormValidatorInitResult, FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
-  init(targetElement, parameters) {
-    const id = parameters.argumentString;
+  init(targetElement, data) {
+    const id = data.argumentString;
+    const otherElement = document.getElementById(id);
 
-    // eslint-disable-next-line no-param-reassign
-    parameters.otherElement = document.getElementById(id);
-
-    if (parameters.otherElement == null) {
+    if (otherElement == null) {
       throw new Error(`There is no '#${id}' element`);
     }
 
-    return [targetElement, parameters.otherElement];
+    return new FormValidatorInitResult({
+      observableElementList: [targetElement, otherElement],
+      extraData: {
+        otherElement,
+      },
+    });
   },
-  validate(targetElement, parameters) {
+  validate(targetElement, data) {
     return new FormValidatorValidationResult({
-      isValid: targetElement.value === parameters.otherElement.value,
+      isValid: targetElement.value === data.otherElement.value,
       elements: [targetElement],
     });
   },

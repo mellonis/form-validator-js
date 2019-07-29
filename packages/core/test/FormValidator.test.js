@@ -1,4 +1,7 @@
-import FormValidator from '@form-validator-js/core';
+import FormValidator, {
+  FormValidatorInitResult,
+  FormValidatorValidationResult,
+} from '@form-validator-js/core';
 
 describe('FormValidator', () => {
   let form;
@@ -61,7 +64,7 @@ describe('FormValidator.addValidator', () => {
     form: document.createElement('form'),
   });
 
-  test('ok', () => {
+  test('can be called', () => {
     expect(() => {
       formValidator.addValidators({
         someValidatorName: {},
@@ -166,5 +169,185 @@ describe('FormValidator.getValidatorNameToArgumentStringMap', () => {
       )
         .toEqual(validMapEntrinesAsList);
     });
+  });
+});
+
+describe('FormValidator validations', () => {
+  const formValidatorParams = {
+    validatorDeclarations: {
+      a: {
+        validate() {
+          return new FormValidatorValidationResult({
+            isValid: false,
+          });
+        },
+        errorMessage: 'a',
+      },
+      b: {
+        validate() {
+          return new FormValidatorValidationResult({
+            isContextError: true,
+            isValid: false,
+          });
+        },
+        errorMessage: 'b',
+      },
+    },
+  };
+  let form;
+  let input;
+  let onErrorMessageListChangedMock;
+
+  beforeEach(() => {
+    form = document.createElement('form');
+    input = document.createElement('input');
+    input.type = 'text';
+    input.setAttribute('data-validation', 'a,b,c');
+    form.appendChild(input);
+    onErrorMessageListChangedMock = jest.fn(() => {
+    });
+  });
+
+  test('invalid validation result is ignored', () => {
+    // eslint-disable-next-line no-new
+    new FormValidator({
+      form,
+      onErrorMessageListChanged: onErrorMessageListChangedMock,
+      validatorDeclarations: {
+        ...formValidatorParams.validatorDeclarations,
+        c: {
+          validate() {
+            return null;
+          },
+        },
+      },
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(
+      onErrorMessageListChangedMock.mock.calls
+        .map(args => args[1][0])
+        .sort((a, b) => a.localeCompare(b)),
+    )
+      .toEqual(['a', 'b']);
+  });
+
+  test('undefined validate method fallback', () => {
+    // eslint-disable-next-line no-new
+    new FormValidator({
+      form,
+      onErrorMessageListChanged: onErrorMessageListChangedMock,
+      validatorDeclarations: {
+        c: {},
+      },
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(
+      onErrorMessageListChangedMock.mock.calls.length,
+    )
+      .toBe(0);
+  });
+
+  test('observable element', () => {
+    const observableInput = document.createElement('input');
+
+    observableInput.type = 'text';
+    form.appendChild(observableInput);
+
+    const validateMock = jest.fn(() => new FormValidatorValidationResult({
+      isValid: true,
+    }));
+
+    // eslint-disable-next-line no-new
+    new FormValidator({
+      form,
+      onErrorMessageListChanged: onErrorMessageListChangedMock,
+      validatorDeclarations: {
+        c: {
+          init(targetElement) {
+            return new FormValidatorInitResult({
+              observableElementList: [targetElement, observableInput],
+            });
+          },
+          validate: validateMock,
+        },
+      },
+    });
+
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    observableInput.dispatchEvent(new Event('input', { bubbles: true }));
+    observableInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(validateMock.mock.calls.length)
+      .toBe(4);
+  });
+
+  test('element and context errors reset', () => {
+    // eslint-disable-next-line no-new
+    new FormValidator({
+      form,
+      onErrorMessageListChanged: onErrorMessageListChangedMock,
+      ...formValidatorParams,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    form.dispatchEvent(new Event('reset'));
+    expect(
+      onErrorMessageListChangedMock.mock.calls
+        .sort((a, b) => a[0].tagName.localeCompare(b[0].tagName)),
+    )
+      .toEqual([
+        [form, ['b']],
+        [form, []],
+        [input, ['a']],
+        [input, []],
+      ]);
+  });
+
+  test('ignoreValidationResult = true', () => {
+    const formValidator = new FormValidator({
+      form,
+      onErrorMessageListChanged: onErrorMessageListChangedMock,
+      ...formValidatorParams,
+    });
+
+    formValidator.ignoreValidationResult = true;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(onErrorMessageListChangedMock.mock.calls.length)
+      .toBe(0);
+  });
+
+  test('override validation result', () => {
+    // eslint-disable-next-line no-new
+    new FormValidator({
+      form,
+      onErrorMessageListChanged: onErrorMessageListChangedMock,
+      validatorDeclarations: {
+        c: {
+          validate() {
+
+          },
+          errorMessage: {
+            c: 'c - subtype message',
+          },
+        },
+      },
+    });
+
+    input.dispatchEvent(FormValidator.createValidateEvent({
+      data: {
+        c: new FormValidatorValidationResult({
+          isValid: false,
+          validatorSubtypeList: ['c'],
+        }),
+      },
+    }));
+    expect(
+      onErrorMessageListChangedMock.mock.calls.length,
+    )
+      .toBe(1);
+    expect(
+      onErrorMessageListChangedMock.mock.calls[0][1],
+    )
+      .toEqual(['c - subtype message']);
   });
 });

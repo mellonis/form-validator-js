@@ -5,7 +5,7 @@ import minLength from './validators/minLength';
 import pattern from './validators/pattern';
 import required from './validators/required';
 
-export default {
+export {
   checkedCount,
   equalTo,
   maxLength,

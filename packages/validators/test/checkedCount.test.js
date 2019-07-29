@@ -1,5 +1,5 @@
 import FormValidator from '@form-validator-js/core';
-import validators from '@form-validator-js/validators';
+import { checkedCount } from '@form-validator-js/validators';
 
 describe('checkedCount.init', () => {
   const validParametersList = [
@@ -40,8 +40,8 @@ describe('checkedCount.init', () => {
 
       const form = document.getElementById('attrs-test');
       const checkedCountMock = {
-        init: jest.fn(validators.checkedCount.init),
-        validate: jest.fn(validators.checkedCount.validate),
+        init: jest.fn(checkedCount.init),
+        validate: jest.fn(checkedCount.validate),
       };
       const dataValidationCheckboxLost = Array.from(form.querySelectorAll('input[name="checked-count1"]'));
 
@@ -55,13 +55,17 @@ describe('checkedCount.init', () => {
         },
       });
 
-      expect(checkedCountMock.init.mock.calls.length).toBe(1);
-      expect(checkedCountMock.init.mock.calls[0][0]).toBe(dataValidationCheckboxLost[0]);
-      expect(checkedCountMock.init.mock.results[0].value).toEqual(dataValidationCheckboxLost);
+      expect(checkedCountMock.init.mock.calls.length)
+        .toBe(1);
+      expect(checkedCountMock.init.mock.calls[0][0])
+        .toBe(dataValidationCheckboxLost[0]);
+      expect(checkedCountMock.init.mock.results[0].value.observableElementList)
+        .toEqual(dataValidationCheckboxLost);
       expect({
-        minCount: checkedCountMock.init.mock.calls[0][1].minCount,
-        maxCount: checkedCountMock.init.mock.calls[0][1].maxCount,
-      }).toEqual(validResult);
+        minCount: checkedCountMock.init.mock.results[0].value.extraData.minCount,
+        maxCount: checkedCountMock.init.mock.results[0].value.extraData.maxCount,
+      })
+        .toEqual(validResult);
     });
   });
 
@@ -91,11 +95,12 @@ describe('checkedCount.init', () => {
           form,
           validatorDeclarations: {
             'checked-count': {
-              ...validators.checkedCount,
+              ...checkedCount,
             },
           },
         });
-      }).toThrowError('Invalid validator arguments');
+      })
+        .toThrowError('Invalid validator arguments');
     });
   });
 
@@ -112,11 +117,12 @@ describe('checkedCount.init', () => {
         form,
         validatorDeclarations: {
           'checked-count': {
-            ...validators.checkedCount,
+            ...checkedCount,
           },
         },
       });
-    }).toThrowError('Unsupported element type');
+    })
+      .toThrowError('Unsupported element type');
   });
 });
 
@@ -133,8 +139,8 @@ describe('checkedCount.validate', () => {
 
     const form = document.getElementById('attrs-test');
     checkedCountMock = {
-      init: jest.fn(validators.checkedCount.init),
-      validate: jest.fn(validators.checkedCount.validate),
+      init: jest.fn(checkedCount.init),
+      validate: jest.fn(checkedCount.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -149,18 +155,23 @@ describe('checkedCount.validate', () => {
   });
 
   test('validator called', () => {
-    expect(checkedCountMock.validate.mock.calls.length).toBe(0);
+    expect(checkedCountMock.validate.mock.calls.length)
+      .toBe(0);
 
     const input = document.querySelector('[data-validation]');
 
     input.dispatchEvent(new Event('input', { bubbles: true }));
 
-    expect(checkedCountMock.validate.mock.calls.length).toBe(1);
-    expect(checkedCountMock.validate.mock.results[0].value.isValid).toBe(false);
+    expect(checkedCountMock.validate.mock.calls.length)
+      .toBe(1);
+    expect(checkedCountMock.validate.mock.results[0].value.isValid)
+      .toBe(false);
 
     input.dispatchEvent(new Event('click'));
 
-    expect(checkedCountMock.validate.mock.calls.length).toBe(2);
-    expect(checkedCountMock.validate.mock.results[1].value.isValid).toBe(true);
+    expect(checkedCountMock.validate.mock.calls.length)
+      .toBe(2);
+    expect(checkedCountMock.validate.mock.results[1].value.isValid)
+      .toBe(true);
   });
 });

@@ -1,0 +1,29 @@
+{
+  "name": "demo",
+  "version": "0.0.1",
+  "description": "Form Validator Demo Page",
+  "main": "src/js/index.js",
+  "scripts": {
+    "buiild": "rollup ",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
+  "license": "ISC",
+  "dependencies": {
+    "@babel/plugin-transform-classes": "^7.5.5",
+    "@form-validator-js/core": "0.0.1",
+    "@form-validator-js/validators": "0.0.1",
+    "rollup": "^1.17.0",
+    "rollup-plugin-babel": "^4.3.3",
+    "rollup-plugin-commonjs": "^10.0.1",
+    "rollup-plugin-node-resolve": "^5.2.0"
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-block-scoping": "^7.5.5",
+    "@babel/plugin-transform-classes": "^7.5.5",
+    "node-sass": "^4.12.0",
+    "rollup-plugin-analyzer": "^3.1.2",
+    "rollup-plugin-postcss": "^2.0.3",
+    "rollup-plugin-terser": "^5.1.1"
+  }
+}

@@ -1,20 +1,20 @@
-import FormValidator, { FormValidatorValidationResult } from '@form-validator-js/core';
+import FormValidator, { FormValidatorInitResult, FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
-  init(targetElement, parameters) {
+  init(targetElement, data) {
     const elementType = FormValidator.getElementType(targetElement);
+    let observableElementList;
 
     switch (elementType) {
       case 'checkbox':
       case 'radio':
-        // eslint-disable-next-line no-param-reassign
-        parameters.elementList = Array.from(document.querySelectorAll(`[type="${elementType}"][name="${targetElement.name}"]`));
+        observableElementList = Array.from(document.querySelectorAll(`[type="${elementType}"][name="${targetElement.name}"]`));
         break;
       default:
         throw new Error('Unsupported element type');
     }
 
-    const boundList = parameters.argumentString
+    const boundList = data.argumentString
       .trim()
       .split(',')
       .slice(0, 2)
@@ -44,20 +44,22 @@ export default {
       // no default
     }
 
-    Object.assign(parameters, {
-      minCount: boundList[0],
-      maxCount: boundList[1],
+    return new FormValidatorInitResult({
+      observableElementList,
+      extraData: {
+        elementList: observableElementList,
+        minCount: boundList[0],
+        maxCount: boundList[1],
+      },
     });
-
-    return parameters.elementList;
   },
-  validate(targetElement, parameters) {
-    const checkedCount = parameters.elementList.filter(element => element.checked).length;
+  validate(targetElement, data) {
+    const checkedCount = data.elementList.filter(element => element.checked).length;
 
     return new FormValidatorValidationResult({
       validatorName: 'checked-count',
       isContextError: true,
-      isValid: parameters.minCount <= checkedCount && checkedCount <= parameters.maxCount,
+      isValid: data.minCount <= checkedCount && checkedCount <= data.maxCount,
     });
   },
 };

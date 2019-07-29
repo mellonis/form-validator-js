@@ -1,5 +1,5 @@
 /**
- * @typedef {Object} FormValidatorAnswerParams_t
+ * @typedef {Object} FormValidatorInitResult_t
  * @property {string} [validatorName='']
  * @property {Array.<string>} [validatorSubtypeList=[]]
  * @property {boolean} [isContextError=false]
@@ -8,7 +8,7 @@
 
 /**
  * @class FormValidatorValidationResult
- * @param {FormValidatorAnswerParams_t} params
+ * @param {FormValidatorInitResult_t} params
  */
 export default class FormValidatorValidationResult {
   constructor({

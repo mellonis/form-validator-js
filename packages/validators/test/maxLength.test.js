@@ -1,5 +1,5 @@
 import FormValidator from '@form-validator-js/core';
-import validators from '@form-validator-js/validators';
+import { maxLength } from '@form-validator-js/validators';
 
 describe('maxLength.init', () => {
   const validParametersList = [
@@ -22,8 +22,8 @@ describe('maxLength.init', () => {
 
       const form = document.getElementById('attrs-test');
       const maxLengthMock = {
-        init: jest.fn(validators.maxLength.init),
-        validate: jest.fn(validators.maxLength.validate),
+        init: jest.fn(maxLength.init),
+        validate: jest.fn(maxLength.validate),
       };
       const input = form.querySelector('input');
 
@@ -37,12 +37,16 @@ describe('maxLength.init', () => {
         },
       });
 
-      expect(maxLengthMock.init.mock.calls.length).toBe(1);
-      expect(maxLengthMock.init.mock.calls[0][0]).toBe(input);
-      expect(maxLengthMock.init.mock.results[0].value).toEqual([input]);
+      expect(maxLengthMock.init.mock.calls.length)
+        .toBe(1);
+      expect(maxLengthMock.init.mock.calls[0][0])
+        .toBe(input);
+      expect(maxLengthMock.init.mock.results[0].value.observableElementList)
+        .toEqual([input]);
       expect({
-        maxLength: maxLengthMock.init.mock.calls[0][1].maxLength,
-      }).toEqual(validResult);
+        maxLength: maxLengthMock.init.mock.results[0].value.extraData.maxLength,
+      })
+        .toEqual(validResult);
     });
   });
 
@@ -64,11 +68,12 @@ describe('maxLength.init', () => {
           form,
           validatorDeclarations: {
             'max-length': {
-              ...validators.maxLength,
+              ...maxLength,
             },
           },
         });
-      }).toThrowError('Invalid validator arguments');
+      })
+        .toThrowError('Invalid validator arguments');
     });
   });
 
@@ -85,25 +90,26 @@ describe('maxLength.init', () => {
         form,
         validatorDeclarations: {
           'max-length': {
-            ...validators.maxLength,
+            ...maxLength,
           },
         },
       });
-    }).toThrowError('Unsupported element type');
+    })
+      .toThrowError('Unsupported element type');
   });
 });
 
 describe('maxLength.validate', () => {
   test('validator called', () => {
-    const maxLength = 3;
+    const maxLengthValue = 3;
 
     document.body.innerHTML = `<form id="attrs-test">    
-    <input type="text" data-validation="max-length(${maxLength})">
+    <input type="text" data-validation="max-length(${maxLengthValue})">
     </form>`;
     const form = document.getElementById('attrs-test');
     const maxLengthMock = {
-      init: jest.fn(validators.maxLength.init),
-      validate: jest.fn(validators.maxLength.validate),
+      init: jest.fn(maxLength.init),
+      validate: jest.fn(maxLength.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -122,7 +128,7 @@ describe('maxLength.validate', () => {
       input.value = value;
       input.dispatchEvent(new Event('input', { bubbles: true }));
 
-      return value.length <= maxLength;
+      return value.length <= maxLengthValue;
     });
 
     expect(maxLengthMock.validate.mock.results.map(result => result.value.isValid))

@@ -1,11 +1,10 @@
-import FormValidator, { FormValidatorValidationResult } from '@form-validator-js/core';
+import FormValidator, { FormValidatorInitResult, FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
-  init(targetElement, parameters) {
-    // eslint-disable-next-line no-param-reassign
-    parameters.maxLength = Number(parameters.argumentString);
+  init(targetElement, data) {
+    const maxLength = Number(data.argumentString);
 
-    if (Number.isNaN(parameters.maxLength)) {
+    if (Number.isNaN(maxLength)) {
       throw new Error('Invalid validator arguments');
     }
 
@@ -14,14 +13,19 @@ export default {
       case 'password':
       case 'tel':
       case 'textarea':
-        return [targetElement];
+        return new FormValidatorInitResult({
+          observableElementList: [targetElement],
+          extraData: {
+            maxLength,
+          },
+        });
       default:
         throw new Error('Unsupported element type');
     }
   },
-  validate(targetElement, parameters) {
+  validate(targetElement, data) {
     return new FormValidatorValidationResult({
-      isValid: targetElement.value.length <= parameters.maxLength,
+      isValid: targetElement.value.length <= data.maxLength,
       elements: [targetElement],
     });
   },

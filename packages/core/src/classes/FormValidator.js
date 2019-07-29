@@ -1,4 +1,5 @@
 import FormValidatorValidationResult from './FormValidatorValidationResult';
+import FormValidatorInitResult from './FormValidatorInitResult';
 
 /**
  * @typedef {Array.<(HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement)>} ValidatorInitResult_t
@@ -32,7 +33,7 @@ import FormValidatorValidationResult from './FormValidatorValidationResult';
  * @typedef {Object} FormValidatorParams_t
  * @property {HTMLFormElement} form
  * @property {ValidatorDeclarations_t} [validatorDeclarations={}]
- * @property [onValidate=() => {}]
+ * @property [onErrorMessageListChanged=() => {}]
  */
 
 /**
@@ -50,22 +51,27 @@ export default class FormValidator {
 
   #observableToTargetSetMap;
 
-  #onValidate;
+  #onErrorMessageListChanged;
 
   #targetElementToStorageMap;
 
   #validatorNameToDefinitionMap = new Map();
 
-  constructor({ form, validatorDeclarations = {}, onValidate = () => {} }) {
+  constructor({
+    form,
+    validatorDeclarations = {},
+    onErrorMessageListChanged = () => {}
+  }) {
     if (!(form instanceof HTMLFormElement)) {
       throw new Error('form must be an HTMLFormElement');
     }
 
     this.#form = form;
-    this.#onValidate = onValidate;
+    this.#onErrorMessageListChanged = onErrorMessageListChanged;
     this.#form.setAttribute('novalidate', '');
     this.#form.setAttribute('data-validation-context', '*');
     this.addValidators(validatorDeclarations);
+    this.#form.addEventListener('submit', this.#submitEventHandler.bind(this));
     this.#form.addEventListener('input', this.#inputEventHandler.bind(this));
     this.#form.addEventListener('reset', this.#resetEventHandler.bind(this));
     this.#form.addEventListener('validate', this.#validateEventHandler.bind(this));
@@ -108,13 +114,23 @@ export default class FormValidator {
     });
   }
 
+  static #getErrorMessageList(errorList) {
+    return errorList
+      .map(error => error.message)
+      .filter(message => message && message.length > 0);
+  }
+
   addValidators(validatorDeclarations) {
     Object.keys(validatorDeclarations)
       .forEach((key) => {
         const validatorDeclaration = validatorDeclarations[key] || {};
         const {
-          init = element => [element],
-          validate = () => ({ isValid: true }),
+          init = element => new FormValidatorInitResult({
+            observableElementList: [element],
+          }),
+          validate = () => new FormValidatorValidationResult({
+            isValid: true,
+          }),
         } = validatorDeclaration;
 
         if (typeof init !== 'function' || typeof validate !== 'function') {
@@ -193,22 +209,25 @@ export default class FormValidator {
 
         validatorNameToArgumentStringMap
           .forEach((argumentString, validatorName) => {
-            validatorNameToContextMap
-              .set(validatorName, this.#getContext(targetElement, validatorName));
-            validatorNameToDataMap
-              .set(validatorName, { argumentString });
-          });
-
-        Array.from(validatorNameToArgumentStringMap.keys())
-          .forEach((validatorNameToExecute) => {
-            this.#validatorNameToDefinitionMap.get(validatorNameToExecute)
+            const initResult = this.#validatorNameToDefinitionMap.get(validatorName)
               .init
               .apply(null, [
                 targetElement,
-                validatorNameToDataMap.get(validatorNameToExecute),
-              ])
-              .filter(observable => observable !== targetElement)
-              .forEach(observable => this.#addObservableElement(targetElement, observable));
+                { argumentString },
+              ]);
+
+            if (initResult instanceof FormValidatorInitResult) {
+              validatorNameToContextMap
+                .set(validatorName, this.#getContext(targetElement, validatorName));
+              validatorNameToDataMap
+                .set(validatorName, {
+                  ...initResult.extraData,
+                  argumentString,
+                });
+              initResult.observableElementList
+                .filter(observableElement => observableElement !== targetElement)
+                .forEach(observableElement => this.#addObservableElement(targetElement, observableElement));
+            }
           });
       });
   }
@@ -285,6 +304,11 @@ export default class FormValidator {
     }
   }
 
+  #hasErrors() {
+    return [...this.#elementToErrorListMap.values()]
+      .findIndex(errorList => errorList.length) >= 0;
+  }
+
   #getContext(target, validatorName) {
     const closestContextElement = target.closest('[data-validation-context]');
     let context = this.#contextElementToContextMap.get(closestContextElement);
@@ -324,81 +348,128 @@ export default class FormValidator {
   #resetEventHandler(event) {
     if (event.target === this.#form) {
       [...this.#elementToErrorListMap.keys()]
-        .forEach((element) => this.#onValidate(element, []));
+        .forEach((element) => {
+          this.#elementToErrorListMap.set(element, []);
+          this.#onErrorMessageListChanged(element, []);
+        });
+    }
+  }
+
+  #submitEventHandler(event) {
+    const { target: targetElement } = event;
+
+    if (targetElement === this.#form) {
+      this.#form.querySelectorAll('[data-validation]').forEach((element) => {
+        element.dispatchEvent(FormValidator.createValidateEvent());
+      });
+
+      if (this.#hasErrors()) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+      }
     }
   }
 
   #validateEventHandler(event) {
-    const { target: targetElement } = event;
-    const elementType = FormValidator.getElementType(targetElement);
+    const { target: targetElement, detail: eventData = {} } = event;
 
-    if (elementType) {
-      const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(targetElement);
-      const validationResultList = Array.from(validatorNameToContextMap)
-        .map(([validatorName]) => {
-          const data = validatorNameToDataMap.get(validatorName);
-          const validationResult = this.#validatorNameToDefinitionMap.get(validatorName)
-            .validate
-            .apply(null, [
-              targetElement,
-              data,
-            ]);
+    if (targetElement === this.#form) {
 
-          if (!(validationResult instanceof FormValidatorValidationResult)) {
-            throw new Error('Invalid validation result');
+    } else {
+      const elementType = FormValidator.getElementType(targetElement);
+
+      if (elementType) {
+        const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(targetElement);
+        const validationResultList = Array.from(validatorNameToContextMap)
+          .map(([validatorName]) => {
+            const data = validatorNameToDataMap.get(validatorName);
+            let validationResult;
+
+            if (
+              Object.prototype.hasOwnProperty.call(eventData, validatorName)
+              && eventData[validatorName] instanceof FormValidatorValidationResult
+            ) {
+              validationResult = eventData[validatorName];
+            } else {
+              validationResult = this.#validatorNameToDefinitionMap.get(validatorName)
+                .validate
+                .apply(null, [
+                  targetElement,
+                  data,
+                ]);
+            }
+
+            if (!(validationResult instanceof FormValidatorValidationResult)) {
+              return null;
+            }
+
+            validationResult.validatorName = validatorName;
+
+            if (this.ignoreValidationResult) {
+              return new FormValidatorValidationResult({
+                ...validationResult,
+                isValid: true,
+              });
+            }
+
+            return validationResult;
+          })
+          .filter(validationResult => !!validationResult);
+
+        const { elementSet, elementToErrorMessageBeforeValidationListMap } = validationResultList.reduce(({ elementSet, elementToErrorMessageBeforeValidationListMap }, validationResult) => {
+          const {
+            isContextError,
+            isValid,
+            validatorName,
+          } = validationResult;
+          let element;
+
+          if (isContextError) {
+            const context = this.#getContext(targetElement, validatorName);
+
+            element = context.element;
+          } else {
+            element = targetElement;
           }
 
-          validationResult.validatorName = validatorName;
-
-          if (this.ignoreValidationResult) {
-            return new FormValidatorValidationResult({
-              ...validationResult,
-              isValid: true,
-            });
+          if (!(elementToErrorMessageBeforeValidationListMap.has(element))) {
+            elementToErrorMessageBeforeValidationListMap
+              .set(element, FormValidator.#getErrorMessageList(this.#elementToErrorListMap.get(element)));
           }
-
-          return validationResult;
-        });
-
-      const elementSet = validationResultList.reduce((elementSet, validationResult) => {
-        const {
-          isContextError,
-          isValid,
-          validatorName,
-        } = validationResult;
-
-        if (isContextError) {
-          const context = this.#getContext(targetElement, validatorName);
 
           if (isValid) {
-            this.#removeError(context.element, validationResult);
+            this.#removeError(element, validationResult);
           } else {
-            this.#addError(context.element, validationResult);
+            this.#addError(element, validationResult);
           }
 
-          elementSet.add(context.element);
-        } else {
-          if (isValid) {
-            this.#removeError(targetElement, validationResult);
-          } else {
-            this.#addError(targetElement, validationResult);
-          }
+          elementSet.add(element);
 
-          elementSet.add(targetElement);
-        }
-
-        return elementSet;
-      }, new Set());
-
-
-      [...elementSet]
-        .forEach((element) => {
-          const errorMessageList = this.#elementToErrorListMap.get(element)
-            .map(error => error.message)
-            .filter(message => message && message.length > 0);
-
-          this.#onValidate(element, errorMessageList);
+          return {
+            elementSet,
+            elementToErrorMessageBeforeValidationListMap
+          };
+        }, {
+          elementSet: new Set(),
+          elementToErrorMessageBeforeValidationListMap: new Map(),
         });
+
+        [...elementSet]
+          .forEach((element) => {
+            const errorMessageBeforeValidationList = elementToErrorMessageBeforeValidationListMap.get(element);
+            const errorMessageAfterValidationList = FormValidator.#getErrorMessageList(this.#elementToErrorListMap.get(element));
+
+            if (!(
+              errorMessageBeforeValidationList.length === errorMessageAfterValidationList.length
+              &&
+              errorMessageBeforeValidationList.findIndex((errorMessage, ix) => {
+                return errorMessage !== errorMessageAfterValidationList[ix];
+              }) < 0
+            )) {
+              this.#onErrorMessageListChanged(element, errorMessageAfterValidationList);
+            }
+          });
+      }
     }
 
     event.stopPropagation();
