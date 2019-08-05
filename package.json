@@ -5,7 +5,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint",
+    "lint": "eslint .",
     "test": "jest",
     "test:watch": "jest --watch"
   },
@@ -27,17 +27,5 @@
     "eslint-plugin-import": "^2.18.1",
     "jest": "^24.8.0",
     "lerna": "^3.16.0"
-  },
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "targets": {
-            "node": "current"
-          }
-        }
-      ]
-    ]
   }
 }
