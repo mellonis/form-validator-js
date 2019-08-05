@@ -12,7 +12,7 @@ describe('FormValidatorInitResult', () => {
       // eslint-disable-next-line no-new
       new FormValidatorInitResult({});
     })
-      .toThrowError(/is not iterable$/);
+      .toThrowError(/is not iterable/);
 
     expect(new FormValidatorInitResult({
       observableElementList: [],
