@@ -26,7 +26,6 @@ export default {
   validate(targetElement, data) {
     return new FormValidatorValidationResult({
       isValid: targetElement.value.length >= data.minLength,
-      elements: [targetElement],
     });
   },
 };

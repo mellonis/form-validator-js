@@ -53,7 +53,6 @@ export default {
     return new FormValidatorValidationResult({
       isContextError,
       isValid,
-      elements: data.elementList,
     });
   },
 };

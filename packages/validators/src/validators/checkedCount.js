@@ -57,7 +57,6 @@ export default {
     const checkedCount = data.elementList.filter(element => element.checked).length;
 
     return new FormValidatorValidationResult({
-      validatorName: 'checked-count',
       isContextError: true,
       isValid: data.minCount <= checkedCount && checkedCount <= data.maxCount,
     });

@@ -24,7 +24,6 @@ export default {
 
     return new FormValidatorValidationResult({
       isValid: value.length === 0 || data.regExp.test(value),
-      elements: [targetElement],
     });
   },
 };

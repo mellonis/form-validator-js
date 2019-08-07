@@ -19,7 +19,6 @@ export default {
   validate(targetElement, data) {
     return new FormValidatorValidationResult({
       isValid: targetElement.value === data.otherElement.value,
-      elements: [targetElement],
     });
   },
 };

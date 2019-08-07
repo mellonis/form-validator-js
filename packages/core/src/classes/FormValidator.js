@@ -360,12 +360,10 @@ export default class FormValidator {
     const closestContextElement = target.closest('[data-validation-context]');
     let context = this.#contextElementToContextMap.get(closestContextElement);
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      if (context.validatorNameList.indexOf(validatorName) >= 0 || context.validatorNameList.indexOf('*') >= 0) {
-        break;
-      }
-
+    while (
+      context.validatorNameList.indexOf(validatorName) < 0
+      && context.validatorNameList.indexOf('*') < 0
+    ) {
       context = context.parent;
     }
 
