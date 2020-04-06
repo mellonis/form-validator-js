@@ -14,7 +14,7 @@ describe('FormValidator', () => {
 
   test('constructor', () => {
     expect(() => new FormValidator())
-      .toThrowError('Cannot destructure property `form` of \'undefined\' or \'null\'.');
+      .toThrowError(/^Cannot destructure property/);
     expect(() => new FormValidator({}))
       .toThrowError('form must be an HTMLFormElement');
     expect(() => new FormValidator({ form }))
