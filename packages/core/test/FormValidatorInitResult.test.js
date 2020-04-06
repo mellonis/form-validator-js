@@ -6,7 +6,7 @@ describe('FormValidatorInitResult', () => {
       // eslint-disable-next-line no-new
       new FormValidatorInitResult();
     })
-      .toThrowError('Cannot destructure property `observableElementList` of \'undefined\' or \'null\'.');
+      .toThrowError(/^Cannot destructure property/);
 
     expect(() => {
       // eslint-disable-next-line no-new
