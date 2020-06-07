@@ -75,10 +75,10 @@ export default class FormValidator {
     this.#form.setAttribute('novalidate', '');
     this.#form.setAttribute('data-validation-context', '*');
     this.addValidators(validatorDeclarations);
-    this.#form.addEventListener('submit', this.#submitEventHandler.bind(this));
-    this.#form.addEventListener('input', this.#inputEventHandler.bind(this));
-    this.#form.addEventListener('reset', this.#resetEventHandler.bind(this));
-    this.#form.addEventListener('validate', this.#validateEventHandler.bind(this));
+    this.#form.addEventListener('submit', this.#submitEventHandler);
+    this.#form.addEventListener('input', this.#inputEventHandler);
+    this.#form.addEventListener('reset', this.#resetEventHandler);
+    this.#form.addEventListener('validate', this.#validateEventHandler);
 
     Object.defineProperties(this.#elementToSpecificErrorMessageMapFacade, {
       set: {
@@ -311,7 +311,7 @@ export default class FormValidator {
     targetSet.add(target);
   }
 
-  #buildContextTree = (root = null, parent = null) => {
+  #buildContextTree = (root, parent = null) => {
     const context = {
       element: root,
       parent,
@@ -337,7 +337,7 @@ export default class FormValidator {
     });
   }
 
-  #inputEventHandler = (event) => {
+  #inputEventHandler = function inputEventHandler(event) {
     const { target: targetElement } = event;
 
     if (this.#targetElementToStorageMap.has(targetElement)) {
@@ -350,7 +350,7 @@ export default class FormValidator {
           observer.dispatchEvent(FormValidator.createValidateEvent());
         });
     }
-  }
+  }.bind(this);
 
   #hasErrors = () => [...this.#elementToErrorListMap.values()]
     .findIndex((errorList) => errorList.length) >= 0
@@ -387,7 +387,7 @@ export default class FormValidator {
     this.#elementToErrorListMap.set(element, errorList);
   }
 
-  #resetEventHandler = (event) => {
+  #resetEventHandler = function resetEventHandler(event) {
     if (event.target === this.#form) {
       [...this.#elementToErrorListMap.keys()]
         .forEach((element) => {
@@ -395,9 +395,9 @@ export default class FormValidator {
           this.#onErrorMessageListChanged(element, []);
         });
     }
-  }
+  }.bind(this);
 
-  #submitEventHandler = (event) => {
+  #submitEventHandler = function submitEventHandler(event) {
     const { target: targetElement } = event;
 
     if (targetElement === this.#form) {
@@ -410,9 +410,9 @@ export default class FormValidator {
         event.preventDefault();
       }
     }
-  }
+  }.bind(this);
 
-  #validateEventHandler = (event) => {
+  #validateEventHandler = function validateEventHandler(event) {
     const { target: targetElement, detail: eventData = {} } = event;
 
     // eslint-disable-next-line no-empty
@@ -517,5 +517,5 @@ export default class FormValidator {
     }
 
     event.stopPropagation();
-  }
+  }.bind(this);
 }
