@@ -32,6 +32,7 @@ formValidator.elementToSpecificErrorMessageMap.set(input, {
 });
 
 form.addEventListener('submit', (event) => {
+  // eslint-disable-next-line no-console
   console.warn(event);
   event.preventDefault();
 });
