@@ -131,7 +131,7 @@ describe('minLength.validate', () => {
       return value.length >= minLengthValue;
     });
 
-    expect(minLengthMock.validate.mock.results.map(result => result.value.isValid))
+    expect(minLengthMock.validate.mock.results.map((result) => result.value.isValid))
       .toEqual(validList);
   });
 });

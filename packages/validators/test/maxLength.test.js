@@ -131,7 +131,7 @@ describe('maxLength.validate', () => {
       return value.length <= maxLengthValue;
     });
 
-    expect(maxLengthMock.validate.mock.results.map(result => result.value.isValid))
+    expect(maxLengthMock.validate.mock.results.map((result) => result.value.isValid))
       .toEqual(validList);
   });
 });

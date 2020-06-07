@@ -97,7 +97,7 @@ describe('equalTo.validate', () => {
     that.dispatchEvent(FormValidator.createValidateEvent());
     other.dispatchEvent(FormValidator.createValidateEvent());
 
-    expect(equalToMock.validate.mock.results.map(result => result.value.isValid))
+    expect(equalToMock.validate.mock.results.map((result) => result.value.isValid))
       .toEqual([true, false, true]);
   });
 });

@@ -7,5 +7,5 @@
     "test": "../../node_modules/.bin/jest --colors"
   },
   "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
-  "license": "ISC"
+  "license": "MIT"
 }

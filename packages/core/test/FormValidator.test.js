@@ -225,7 +225,7 @@ describe('FormValidator validations', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
     expect(
       onErrorMessageListChangedMock.mock.calls
-        .map(args => args[1][0])
+        .map((args) => args[1][0])
         .sort((a, b) => a.localeCompare(b)),
     )
       .toEqual(['a', 'b']);
@@ -373,13 +373,13 @@ describe('FormValidator validations', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
     expect(
       onErrorMessageListChangedMock.mock.calls
-        .filter(call => call[0] === input).length,
+        .filter((call) => call[0] === input).length,
     )
       .toBe(5);
     expect(
       onErrorMessageListChangedMock.mock.calls
-        .filter(call => call[0] === input)
-        .flatMap(call => call[1]),
+        .filter((call) => call[0] === input)
+        .flatMap((call) => call[1]),
     )
       .toEqual(['a', 'aa', 'a', 'aaa', 'a']);
   });

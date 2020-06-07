@@ -118,7 +118,7 @@ describe('required.validate', () => {
     that.dispatchEvent(new Event('input', { bubbles: true }));
     that.value = '';
     that.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(requiredMock.validate.mock.results.map(result => result.value.isValid))
+    expect(requiredMock.validate.mock.results.map((result) => result.value.isValid))
       .toEqual([false, true, false]);
   });
 
@@ -156,7 +156,7 @@ describe('required.validate', () => {
     other.checked = false;
     other.dispatchEvent(new Event('input', { bubbles: true }));
 
-    expect(requiredMock.validate.mock.results.map(result => result.value.isValid))
+    expect(requiredMock.validate.mock.results.map((result) => result.value.isValid))
       .toEqual([true, false, true, false]);
   });
 });

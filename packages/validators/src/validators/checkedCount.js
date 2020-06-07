@@ -18,7 +18,7 @@ export default {
       .trim()
       .split(',')
       .slice(0, 2)
-      .map(bound => parseInt(bound, 10) || null);
+      .map((bound) => parseInt(bound, 10) || null);
 
     switch (boundList.length) {
       case 1:
@@ -54,7 +54,7 @@ export default {
     });
   },
   validate(targetElement, data) {
-    const checkedCount = data.elementList.filter(element => element.checked).length;
+    const checkedCount = data.elementList.filter((element) => element.checked).length;
 
     return new FormValidatorValidationResult({
       isContextError: true,

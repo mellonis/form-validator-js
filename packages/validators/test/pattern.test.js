@@ -59,10 +59,10 @@ describe('pattern.init', () => {
         .toEqual([input]);
       expect(
         testCaseList
-          .map(testCase => patternMock.init.mock.results[0].value.extraData.regExp
+          .map((testCase) => patternMock.init.mock.results[0].value.extraData.regExp
             .test(testCase[0])),
       )
-        .toEqual(testCaseList.map(testCase => testCase[1]));
+        .toEqual(testCaseList.map((testCase) => testCase[1]));
     });
   });
 
@@ -119,7 +119,7 @@ describe('pattern.validate', () => {
         return value === '' || correctResult;
       });
 
-      expect(patternMock.validate.mock.results.map(result => result.value.isValid))
+      expect(patternMock.validate.mock.results.map((result) => result.value.isValid))
         .toEqual(validList);
     });
   });

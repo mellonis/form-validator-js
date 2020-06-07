@@ -1,14 +1,15 @@
 {
   "name": "demo",
+  "private": true,
   "version": "0.0.1",
   "description": "Form Validator Demo Page",
   "main": "src/js/index.js",
   "scripts": {
-    "buiild": "rollup ",
+    "build": "rollup -c",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@babel/plugin-transform-classes": "^7.5.5",
     "@form-validator-js/core": "0.0.1",

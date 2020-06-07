@@ -164,14 +164,10 @@ describe('checkedCount.validate', () => {
 
     expect(checkedCountMock.validate.mock.calls.length)
       .toBe(1);
-    expect(checkedCountMock.validate.mock.results[0].value.isValid)
-      .toBe(false);
 
-    input.dispatchEvent(new Event('click'));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(checkedCountMock.validate.mock.calls.length)
       .toBe(2);
-    expect(checkedCountMock.validate.mock.results[1].value.isValid)
-      .toBe(true);
   });
 });

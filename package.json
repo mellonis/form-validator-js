@@ -7,25 +7,27 @@
   "scripts": {
     "lint": "eslint .",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage && coveralls < coverage/lcov.info"
   },
-  "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
-  "license": "ISC",
+  "author": "Ruslan Gilmullin <mellonis@yandex.ru>",
+  "license": "MIT",
   "workspaces": [
     "packages/*"
   ],
   "devDependencies": {
-    "@babel/core": "^7.5.5",
-    "@babel/plugin-proposal-class-properties": "^7.5.5",
-    "@babel/plugin-proposal-private-methods": "^7.4.4",
-    "@babel/preset-env": "^7.5.5",
-    "@types/jest": "^24.0.15",
-    "babel-eslint": "^10.0.2",
-    "babel-jest": "^24.8.0",
-    "eslint": "^6.1.0",
-    "eslint-config-airbnb": "^17.1.1",
-    "eslint-plugin-import": "^2.18.1",
-    "jest": "^24.8.0",
-    "lerna": "^3.16.0"
+    "@babel/core": "^7.10.2",
+    "@babel/plugin-proposal-class-properties": "^7.10.1",
+    "@babel/plugin-proposal-private-methods": "^7.10.1",
+    "@babel/preset-env": "^7.10.2",
+    "@types/jest": "^25.2.3",
+    "babel-eslint": "^10.1.0",
+    "babel-jest": "^26.0.1",
+    "coveralls": "^3.1.0",
+    "eslint": "^7.2.0",
+    "eslint-config-airbnb": "^18.1.0",
+    "eslint-plugin-import": "^2.20.2",
+    "jest": "^26.0.1",
+    "lerna": "^3.22.0"
   }
 }

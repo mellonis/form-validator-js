@@ -45,7 +45,7 @@ export default {
       case 'checkbox':
       case 'radio':
         isContextError = true;
-        isValid = data.elementList.filter(el => el.checked).length > 0;
+        isValid = data.elementList.filter((el) => el.checked).length > 0;
         break;
       // no default
     }
