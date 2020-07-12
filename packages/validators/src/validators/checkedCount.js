@@ -44,13 +44,21 @@ export default {
       // no default
     }
 
+    const extraData = {
+      minCount: boundList[0],
+      maxCount: boundList[1],
+    };
+
+    Object.defineProperty(extraData, 'elementList', {
+      enumerable: true,
+      get() {
+        return [...observableElementList];
+      },
+    });
+
     return new FormValidatorInitResult({
       observableElementList,
-      extraData: {
-        elementList: observableElementList,
-        minCount: boundList[0],
-        maxCount: boundList[1],
-      },
+      extraData,
     });
   },
   validate(targetElement, data) {

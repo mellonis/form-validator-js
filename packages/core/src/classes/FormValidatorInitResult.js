@@ -16,9 +16,6 @@ export default class FormValidatorInitResult {
     extraData = {},
   }) {
     const elementList = [...observableElementList];
-    const immutableExtraData = { ...extraData };
-
-    Object.freeze(immutableExtraData);
 
     Object.defineProperties(this, {
       observableElementList: {
@@ -29,9 +26,7 @@ export default class FormValidatorInitResult {
       },
       extraData: {
         enumerable: true,
-        get() {
-          return immutableExtraData;
-        },
+        value: Object.freeze({ ...extraData }),
       },
     });
   }
