@@ -1,4 +1,4 @@
-import FormValidator from '@form-validator-js/core';
+import { FormValidator } from '@form-validator-js/core';
 import { maxLength } from '@form-validator-js/validators';
 
 describe('maxLength.init', () => {
@@ -103,7 +103,7 @@ describe('maxLength.validate', () => {
   test('validator called', () => {
     const maxLengthValue = 3;
 
-    document.body.innerHTML = `<form id="attrs-test">    
+    document.body.innerHTML = `<form id="attrs-test">
     <input type="text" data-validation="max-length(${maxLengthValue})">
     </form>`;
     const form = document.getElementById('attrs-test');

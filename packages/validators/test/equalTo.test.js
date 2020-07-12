@@ -1,4 +1,4 @@
-import FormValidator from '@form-validator-js/core';
+import { FormValidator } from '@form-validator-js/core';
 import { equalTo } from '@form-validator-js/validators';
 
 describe('equalTo.init', () => {

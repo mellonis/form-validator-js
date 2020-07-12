@@ -1,4 +1,4 @@
-import FormValidator from '@form-validator-js/core';
+import { FormValidator } from '@form-validator-js/core';
 import { minLength } from '@form-validator-js/validators';
 
 describe('minLength.init', () => {
@@ -103,7 +103,7 @@ describe('minLength.validate', () => {
   test('validator called', () => {
     const minLengthValue = 3;
 
-    document.body.innerHTML = `<form id="attrs-test">    
+    document.body.innerHTML = `<form id="attrs-test">
     <input type="text" data-validation="min-length(${minLengthValue})">
     </form>`;
     const form = document.getElementById('attrs-test');

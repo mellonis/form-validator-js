@@ -1,4 +1,5 @@
-import FormValidator, {
+import {
+  FormValidator,
   FormValidatorInitResult,
   FormValidatorValidationResult,
 } from '@form-validator-js/core';
@@ -39,7 +40,7 @@ describe('FormValidator', () => {
 
 describe('FormValidator.getElementType', () => {
   document.body.innerHTML = `<div>
-      <div data-type/>      
+      <div data-type/>
       <input data-type="text" type="text">
       <input data-type="password" type="password">
       <input data-type="tel" type="tel">

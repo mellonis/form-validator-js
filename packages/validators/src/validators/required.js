@@ -1,4 +1,4 @@
-import FormValidator, { FormValidatorInitResult, FormValidatorValidationResult } from '@form-validator-js/core';
+import { FormValidator, FormValidatorInitResult, FormValidatorValidationResult } from '@form-validator-js/core';
 
 export default {
   init(targetElement) {

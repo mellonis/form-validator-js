@@ -1,4 +1,4 @@
-import FormValidator from '@form-validator-js/core';
+import { FormValidator } from '@form-validator-js/core';
 import { required } from '@form-validator-js/validators';
 
 describe('required.init', () => {

@@ -1,4 +1,4 @@
-import FormValidator from '@form-validator-js/core';
+import { FormValidator } from '@form-validator-js/core';
 import { pattern } from '@form-validator-js/validators';
 
 const validParametersList = [

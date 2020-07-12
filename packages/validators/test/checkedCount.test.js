@@ -1,4 +1,4 @@
-import FormValidator from '@form-validator-js/core';
+import { FormValidator } from '@form-validator-js/core';
 import { checkedCount } from '@form-validator-js/validators';
 
 describe('checkedCount.init', () => {
