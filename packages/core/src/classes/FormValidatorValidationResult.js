@@ -29,15 +29,11 @@ export default class FormValidatorValidationResult {
       },
       isContextError: {
         enumerable: true,
-        get() {
-          return isContextError;
-        },
+        value: isContextError,
       },
       isValid: {
         enumerable: true,
-        get() {
-          return isValid;
-        },
+        value: isValid,
       },
     });
   }

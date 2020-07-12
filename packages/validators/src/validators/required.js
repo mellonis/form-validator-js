@@ -21,12 +21,20 @@ export default {
         throw new Error('Unsupported element type');
     }
 
+    const extraData = {
+      elementType,
+    };
+
+    Object.defineProperty(extraData, 'elementList', {
+      enumerable: true,
+      get() {
+        return [...elementList];
+      },
+    });
+
     return new FormValidatorInitResult({
       observableElementList: elementList,
-      extraData: {
-        elementType,
-        elementList,
-      },
+      extraData,
     });
   },
   validate(targetElement, data) {
