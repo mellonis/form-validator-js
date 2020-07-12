@@ -1,8 +1,13 @@
 const moduleName = 'core';
 
 module.exports = {
-  name: moduleName,
-  displayName: moduleName,
+  displayName: {
+    name: moduleName,
+    color: 'red',
+  },
+  moduleNameMapper: {
+    '^@form-validator-js/core': '<rootDir>/src',
+  },
   transformIgnorePatterns: [
     'node_modules/(?!@form-validator-js)',
   ],
