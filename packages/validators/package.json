@@ -11,6 +11,6 @@
   "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
   "license": "MIT",
   "peerDependencies": {
-    "@form-validator-js/core": "0.0.1"
+    "@form-validator-js/core": "0.0.2-alpha.1"
   }
 }
