@@ -4,6 +4,6 @@ module.exports = {
   name: moduleName,
   displayName: moduleName,
   transformIgnorePatterns: [
-    'node_modules/(?!@turing-machine-js)',
+    'node_modules/(?!@form-validator-js)',
   ],
 };
