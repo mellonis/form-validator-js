@@ -6,7 +6,7 @@
   "module": "dist/index.es.js",
   "scripts": {
     "build": "rollup -c ../../rollup.config.mjs",
-    "test": "npm run build && jest --colors"
+    "test": "jest --colors"
   },
   "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
   "license": "MIT",
