@@ -1,5 +1,5 @@
 import { FormValidator } from '@form-validator-js/core';
-import { equalTo } from '@form-validator-js/validators';
+import { equalsTo } from '@form-validator-js/validators';
 
 describe('equalTo.init', () => {
   test('valid parameters', () => {
@@ -10,8 +10,8 @@ describe('equalTo.init', () => {
 
     const form = document.getElementById('attrs-test');
     const equalToMock = {
-      init: jest.fn(equalTo.init),
-      validate: jest.fn(equalTo.validate),
+      init: jest.fn(equalsTo.init),
+      validate: jest.fn(equalsTo.validate),
     };
 
     // eslint-disable-next-line no-new
@@ -47,7 +47,7 @@ describe('equalTo.init', () => {
       new FormValidator({
         form,
         validatorDeclarations: {
-          'equal-to': equalTo,
+          'equal-to': equalsTo,
         },
       });
     })
@@ -64,8 +64,8 @@ describe('equalTo.validate', () => {
 
     const form = document.getElementById('attrs-test');
     const equalToMock = {
-      init: jest.fn(equalTo.init),
-      validate: jest.fn(equalTo.validate),
+      init: jest.fn(equalsTo.init),
+      validate: jest.fn(equalsTo.validate),
     };
 
     // eslint-disable-next-line no-new

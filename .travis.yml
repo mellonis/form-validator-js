@@ -3,6 +3,7 @@ node_js:
   - 14
 
 script:
+  - lerna run build
   - npm run lint
   - npm run test:coverage
 

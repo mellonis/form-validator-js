@@ -1,4 +1,4 @@
-import { FormValidatorInitResult } from '../src';
+import { FormValidatorInitResult } from '@form-validator-js/core';
 
 describe('FormValidatorInitResult', () => {
   test('constructor', () => {
