@@ -1,13 +1,42 @@
 {
   "name": "@form-validator-js/core",
-  "version": "0.0.2-alpha.2",
-  "description": "",
-  "main": "dist/index.cjs.js",
-  "module": "dist/index.es.js",
-  "scripts": {
-    "build": "rollup -c ../../rollup.config.mjs",
-    "test": "jest --colors"
+  "version": "1.0.0",
+  "description": "Validation engine for form-validator-js — declarative, data-attribute-driven form validation for vanilla TypeScript / JavaScript.",
+  "keywords": [
+    "form",
+    "validation",
+    "declarative",
+    "data-attributes",
+    "typescript",
+    "vanilla"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
   },
-  "author": "Ruslan Gilmullin <mellonis14@gmain.com>",
-  "license": "MIT"
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --project core"
+  },
+  "author": "Ruslan Gilmullin <mellonis@yandex.ru>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mellonis/form-validator-js.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/mellonis/form-validator-js#readme",
+  "bugs": {
+    "url": "https://github.com/mellonis/form-validator-js/issues"
+  }
 }
