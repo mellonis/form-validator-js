@@ -39,7 +39,7 @@ export default defineConfig({
       provider: 'v8',
       include: ['packages/*/src/**'],
       exclude: ['packages/*/src/**/*.test.ts'],
-      reporter: ['text', 'json'],
+      reporter: ['text', 'json', 'lcov'],
     },
   },
 });
