@@ -283,7 +283,7 @@ Removes all listeners (form-level and per-external-input) and clears internal st
 ```
 packages/
   core/         engine + base classes (FormValidator, FormValidatorInitResult, FormValidatorValidationResult)
-  validators/   six built-in validators (peer-depends on core)
+  validators/   ten built-in validators (peer-depends on core)
 ```
 
 ## Development
