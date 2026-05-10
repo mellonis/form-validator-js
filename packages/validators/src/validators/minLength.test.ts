@@ -106,10 +106,9 @@ describe('minLength.validate', () => {
     ).toEqual(validList);
   });
 
-  test('counts Unicode code points, not UTF-16 code units', () => {
-    // '😀' is one code point but two code units. With code-unit counting,
-    // minLength(3) would accept '😀😀' (4 code units). With code-point
-    // counting, only 3+ emoji pass.
+  test('counts UTF-16 code units (matches native minlength)', () => {
+    // Native HTML minlength counts code units via `.length`. A non-BMP code
+    // point like '😀' is two code units, so minLength(3) accepts '😀😀'.
     document.body.innerHTML = `<form id="attrs-test">
       <input type="text" data-validation="min-length(3)">
     </form>`;
@@ -126,10 +125,9 @@ describe('minLength.validate', () => {
     });
 
     const cases: Array<[string, boolean]> = [
-      ['😀', false],    // 1 cp < 3
-      ['😀😀', false],  // 2 cp < 3
-      ['😀😀😀', true], // 3 cp ≥ 3
-      ['😀😀😀😀', true], // 4 cp ≥ 3
+      ['😀', false],     // 2 code units < 3
+      ['😀a', true],     // 3 code units ≥ 3
+      ['😀😀', true],    // 4 code units ≥ 3
     ];
 
     for (const [value] of cases) {

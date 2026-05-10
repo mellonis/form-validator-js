@@ -1,7 +1,7 @@
 {
   "name": "@form-validator-js/validators",
   "version": "1.0.0",
-  "description": "Built-in validators for form-validator-js: required, minLength, maxLength, pattern, equalsTo, checkedCount.",
+  "description": "Built-in validators for form-validator-js: required, minLength, maxLength, pattern, equalsTo, checkedCount, numeric, min, max, step.",
   "keywords": [
     "form",
     "validation",

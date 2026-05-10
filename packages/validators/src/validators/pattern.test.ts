@@ -76,6 +76,46 @@ describe('pattern.init', () => {
   });
 });
 
+describe('pattern auto-anchoring (matches native HTML pattern attribute)', () => {
+  // Native `pattern` requires the regex to match the entire value. Library
+  // auto-wraps the source in `^(?:...)$` so an unanchored pattern still rejects
+  // values with extra characters around the match.
+  test('unanchored pattern is treated as whole-value match', () => {
+    document.body.innerHTML = `<form id="attrs-test">
+      <input type="text" data-validation="pattern(\\d{4})">
+    </form>`;
+    const form = document.getElementById('attrs-test') as HTMLFormElement;
+    const patternMock = {
+      init: vi.fn(pattern.init),
+      validate: vi.fn(pattern.validate),
+    };
+    const input = document.querySelector<HTMLInputElement>('input')!;
+
+    new FormValidator({ trigger: 'input',
+      form,
+      validatorDeclarations: { pattern: patternMock },
+    });
+
+    const cases: Array<[string, boolean]> = [
+      ['1234', true],
+      ['12345', false],
+      ['abc1234', false],
+      ['1234abc', false],
+    ];
+
+    for (const [value] of cases) {
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    expect(
+      patternMock.validate.mock.results.map(
+        (r) => (r.value as FormValidatorValidationResult).isValid,
+      ),
+    ).toEqual(cases.map(([, expected]) => expected));
+  });
+});
+
 describe('pattern.validate', () => {
   validParametersList.forEach(([validParameter, testCaseList]) => {
     test(`validator called for pattern(${validParameter})`, () => {

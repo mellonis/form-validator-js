@@ -11,7 +11,8 @@ interface PatternData extends Record<string, unknown> {
 
 const pattern: Required<Pick<ValidatorDeclaration, 'init' | 'validate'>> = {
   init(targetElement, data) {
-    const regExp = new RegExp(data.argumentString);
+    // Match native HTML `pattern`: the regex must match the entire value.
+    const regExp = new RegExp(`^(?:${data.argumentString})$`);
 
     switch (FormValidator.getElementType(targetElement)) {
       case 'text':

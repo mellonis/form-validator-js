@@ -44,8 +44,7 @@ const minLength: Required<Pick<ValidatorDeclaration, 'init' | 'validate'>> = {
 
   validate(targetElement, data) {
     const { minLength: min } = data as MinLengthData;
-    // Counts Unicode code points, not UTF-16 code units — `'😀'` reads as 1, not 2.
-    const length = [...(targetElement as HTMLInputElement | HTMLTextAreaElement).value].length;
+    const { length } = (targetElement as HTMLInputElement | HTMLTextAreaElement).value;
     return new FormValidatorValidationResult({
       isValid: length >= min,
     });

@@ -1,6 +1,10 @@
 export { default as checkedCount } from './validators/checkedCount';
 export { default as equalsTo } from './validators/equalsTo';
+export { default as max } from './validators/max';
 export { default as maxLength } from './validators/maxLength';
+export { default as min } from './validators/min';
 export { default as minLength } from './validators/minLength';
+export { default as numeric } from './validators/numeric';
 export { default as pattern } from './validators/pattern';
 export { default as required } from './validators/required';
+export { default as step } from './validators/step';

@@ -120,10 +120,9 @@ describe('maxLength.validate', () => {
     ).toEqual(validList);
   });
 
-  test('counts Unicode code points, not UTF-16 code units', () => {
-    // '😀' is one code point but two code units. With code-unit counting,
-    // maxLength(3) would reject '😀😀' (4 code units). With code-point
-    // counting, both pass.
+  test('counts UTF-16 code units (matches native maxlength)', () => {
+    // Native HTML maxlength counts code units via `.length`. A non-BMP code
+    // point like '😀' is two code units, so maxLength(3) rejects '😀😀'.
     document.body.innerHTML = `<form id="attrs-test">
       <input type="text" data-validation="max-length(3)">
     </form>`;
@@ -140,10 +139,9 @@ describe('maxLength.validate', () => {
     });
 
     const cases: Array<[string, boolean]> = [
-      ['😀', true],     // 1 cp ≤ 3
-      ['😀😀', true],   // 2 cp ≤ 3
-      ['😀😀😀', true], // 3 cp ≤ 3
-      ['😀😀😀😀', false], // 4 cp > 3
+      ['😀', true],      // 2 code units ≤ 3
+      ['😀a', true],     // 3 code units ≤ 3
+      ['😀😀', false],   // 4 code units > 3
     ];
 
     for (const [value] of cases) {

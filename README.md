@@ -80,11 +80,15 @@ Inputs linked to the form via the `form="formId"` attribute (outside the form el
 | Name | DSL | Argument | Notes |
 | --- | --- | --- | --- |
 | `required` | `required` | none | Text-like input, `<textarea>`, `<select>`: non-empty value. Checkbox/radio: at least one in the group is checked. |
-| `minLength` | `minLength(3)` | min character count | Text-like input or `<textarea>`. Counts Unicode code points (`'😀'` reads as 1, not 2). |
-| `maxLength` | `maxLength(20)` | max character count | Text-like input or `<textarea>`. Counts Unicode code points. |
-| `pattern` | `pattern(^\d{4}$)` | regex source | Text-like input or `<textarea>`. Empty value passes — combine with `required` to forbid empty. |
+| `minLength` | `minLength(3)` | min character count | Text-like input or `<textarea>`. Counts UTF-16 code units (matches native `minlength`). |
+| `maxLength` | `maxLength(20)` | max character count | Text-like input or `<textarea>`. Counts UTF-16 code units (matches native `maxlength`). |
+| `pattern` | `pattern(\d{4})` | regex source | Text-like input or `<textarea>`. The regex is auto-anchored (`^(?:…)$`) so it must match the entire value, matching native `pattern`. Empty value passes — combine with `required` to forbid empty. |
 | `equalsTo` | `equalsTo(password)` | id of another field | Cross-field equality, e.g. password confirmation. Strict `===` — Unicode normalization is **not** applied (`'café'` in NFC and NFD are not equal). Intentional, so password matching is byte-exact. |
 | `checkedCount` | `checkedCount(1,3)` | `min`, `max`, or `min,max` | Group min/max for checkboxes / radios. `,N` means up to N. `N,` means N or more. |
+| `numeric` | `numeric` | none | `type="number"`, `date`, `time`, `month`, `week`, `datetime-local`. Rejects unparseable input (`validity.badInput`, plus a defensive parse-side check). Empty value passes — compose with `required`. |
+| `min` | `min(10)` / `min(2026-01-01)` | lower bound | `type="number"`, `date`, `time`, `month`, `week`, `datetime-local`. Bound is parsed in the input's own format. Empty / bad-input passes (compose with `required` / `numeric`). |
+| `max` | `max(100)` / `max(2026-12-31)` | upper bound | Same types as `min`. Empty / bad-input passes. |
+| `step` | `step(0.5)` / `step(7, 2026-01-05)` / `step(900, 09:00)` | `step` or `step,base` | Same types as `min`. The `step` argument is in the type's natural unit (number: 1; date: 1 day; time: 1 s; month: 1 month; week: 1 week; datetime-local: 1 s) and is scaled to compare against the value. Default base is `0` — except `week`, where default base is the Monday of `1970-W01` so the grid lines up with valid week values. Compared within `1e-9` to absorb FP error. Empty / bad-input passes. |
 
 ## Custom validators
 
