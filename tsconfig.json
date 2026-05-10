@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "ignoreDeprecations": "6.0",
+    "types": ["vitest/globals"],
+    "paths": {
+      "@form-validator-js/core": ["./packages/core/src/index.ts"],
+      "@form-validator-js/validators": ["./packages/validators/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts"],
+  "exclude": ["**/dist/**", "**/node_modules/**"]
+}
