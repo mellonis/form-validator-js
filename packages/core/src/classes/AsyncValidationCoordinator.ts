@@ -17,6 +17,7 @@ interface SlotEntry {
 }
 
 export default class AsyncValidationCoordinator {
+  // Stored now; consumed by the resolve/reject/abort methods added in subsequent tasks.
   // eslint-disable-next-line no-unused-private-class-members
   readonly #callbacks: AsyncValidationCoordinatorCallbacks;
 
