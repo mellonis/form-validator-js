@@ -275,3 +275,47 @@ describe('AsyncValidationCoordinator stale generation drops', () => {
     expect(callbacks.onSlotResolved).not.toHaveBeenCalled();
   });
 });
+
+describe('AsyncValidationCoordinator abortSlot', () => {
+  test('abortSlot on existing slot aborts controller, removes slot, fires transitions, no onSlotResolved', () => {
+    const { c, callbacks } = makeCoordinator();
+    const el = document.createElement('input');
+    const ctrl = new AbortController();
+    c.startCycle(el, 'x', deferred<FormValidatorValidationResult>().promise, ctrl);
+    callbacks.onElementPendingChange.mockClear();
+    callbacks.onFormPendingChange.mockClear();
+
+    c.abortSlot(el, 'x');
+
+    expect(ctrl.signal.aborted).toBe(true);
+    expect(c.hasPending()).toBe(false);
+    expect(c.hasPendingFor(el)).toBe(false);
+    expect(callbacks.onElementPendingChange).toHaveBeenCalledWith(el, false);
+    expect(callbacks.onFormPendingChange).toHaveBeenCalledWith(false);
+    expect(callbacks.onSlotResolved).not.toHaveBeenCalled();
+    expect(callbacks.onApplyResult).not.toHaveBeenCalled();
+  });
+
+  test('abortSlot on non-existent slot is a no-op', () => {
+    const { c, callbacks } = makeCoordinator();
+    const el = document.createElement('input');
+    expect(() => c.abortSlot(el, 'nope')).not.toThrow();
+    expect(callbacks.onElementPendingChange).not.toHaveBeenCalled();
+    expect(callbacks.onFormPendingChange).not.toHaveBeenCalled();
+  });
+
+  test('abortSlot on one of two slots on same element keeps element pending', () => {
+    const { c, callbacks } = makeCoordinator();
+    const el = document.createElement('input');
+    c.startCycle(el, 'a', deferred<FormValidatorValidationResult>().promise, new AbortController());
+    c.startCycle(el, 'b', deferred<FormValidatorValidationResult>().promise, new AbortController());
+    callbacks.onElementPendingChange.mockClear();
+    callbacks.onFormPendingChange.mockClear();
+
+    c.abortSlot(el, 'a');
+
+    expect(c.hasPendingFor(el)).toBe(true);
+    expect(callbacks.onElementPendingChange).not.toHaveBeenCalled();
+    expect(callbacks.onFormPendingChange).not.toHaveBeenCalled();
+  });
+});

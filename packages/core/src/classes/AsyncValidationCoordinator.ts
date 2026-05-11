@@ -100,6 +100,22 @@ export default class AsyncValidationCoordinator {
     this.#callbacks.onSlotResolved();
   }
 
+  abortSlot(element: Element, name: string): void {
+    const inner = this.#asyncInFlight.get(element);
+    const slot = inner?.get(name);
+    if (!slot || !inner) return;
+
+    slot.controller.abort();
+    inner.delete(name);
+    if (inner.size === 0) this.#asyncInFlight.delete(element);
+    this.#pendingCount -= 1;
+
+    if (inner.size === 0) this.#callbacks.onElementPendingChange(element, false);
+    if (this.#pendingCount === 0) this.#callbacks.onFormPendingChange(false);
+    // Intentionally NOT firing onSlotResolved — this is external teardown,
+    // not natural slot completion; submit hand-off should not trigger.
+  }
+
   #handleReject(
     element: Element,
     name: string,
