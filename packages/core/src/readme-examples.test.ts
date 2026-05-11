@@ -346,7 +346,9 @@ describe('README: validation contexts', () => {
       init: (target) => {
         const name = (target as HTMLInputElement).name;
         return new FormValidatorInitResult({
-          observableElementList: Array.from(document.getElementsByName(name)),
+          observableElementList: Array.from(
+            document.getElementsByName(name),
+          ) as HTMLInputElement[],
         });
       },
       validate: (target) => {
