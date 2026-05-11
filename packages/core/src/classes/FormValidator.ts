@@ -121,6 +121,7 @@ interface ValidatorDefinition {
   init: ValidatorInitFunction;
   validate: ValidatorValidateFunction;
   errorMessage: Record<string, string>;
+  onError?: (err: unknown) => FormValidatorValidationResult;
 }
 
 interface ValidationContext {
@@ -262,7 +263,8 @@ export default class FormValidator {
     this.#onPendingChange = onPendingChange;
     this.#onFormPendingChange = onFormPendingChange;
     this.#coordinator = new AsyncValidationCoordinator({
-      onApplyResult: (element, _name, result) => {
+      onApplyResult: (element, name, result) => {
+        result.validatorName = name;
         this.#applyResults(element as FormElement, [result]);
       },
       onElementPendingChange: (element, isPending) => {
@@ -392,6 +394,7 @@ export default class FormValidator {
         init,
         validate,
         errorMessage: normalizeErrorMessage(declaration.errorMessage),
+        onError: declaration.onError,
       });
     }
 
@@ -850,29 +853,58 @@ export default class FormValidator {
       const data = validatorNameToDataMap.get(validatorName);
       if (!data) continue;
 
-      let validationResult: FormValidatorValidationResult | Promise<FormValidatorValidationResult> | undefined;
-
       const injected = eventData[validatorName];
       if (injected instanceof FormValidatorValidationResult) {
-        validationResult = injected;
-      } else {
-        const definition = this.#validatorNameToDefinitionMap.get(validatorName);
-        validationResult = definition?.validate(targetElement, data);
+        // Injection path — abort any in-flight async for this slot first.
+        this.#coordinator.abortSlot(targetElement, validatorName);
+        const stamped = injected;
+        stamped.validatorName = validatorName;
+        if (this.ignoreValidationResult) {
+          validationResultList.push(new FormValidatorValidationResult({
+            ...stamped,
+            validatorSubtypeList: stamped.validatorSubtypeList,
+            isValid: true,
+          }));
+        } else {
+          validationResultList.push(stamped);
+        }
+        continue;
       }
 
-      if (!(validationResult instanceof FormValidatorValidationResult)) continue;
+      const definition = this.#validatorNameToDefinitionMap.get(validatorName);
+      if (!definition) continue;
 
-      validationResult.validatorName = validatorName;
+      const controller = new AbortController();
+      const returnValue = definition.validate(
+        targetElement,
+        data,
+        { signal: controller.signal },
+      );
 
-      if (this.ignoreValidationResult) {
-        validationResultList.push(new FormValidatorValidationResult({
-          ...validationResult,
-          validatorSubtypeList: validationResult.validatorSubtypeList,
-          isValid: true,
-        }));
-      } else {
-        validationResultList.push(validationResult);
+      if (returnValue instanceof Promise) {
+        this.#coordinator.startCycle(
+          targetElement,
+          validatorName,
+          returnValue,
+          controller,
+          definition.onError,
+        );
+        // async result will land via coordinator's onApplyResult → #applyResults
+      } else if (returnValue instanceof FormValidatorValidationResult) {
+        // Sync result supersedes any in-flight async for this slot.
+        this.#coordinator.abortSlot(targetElement, validatorName);
+        returnValue.validatorName = validatorName;
+        if (this.ignoreValidationResult) {
+          validationResultList.push(new FormValidatorValidationResult({
+            ...returnValue,
+            validatorSubtypeList: returnValue.validatorSubtypeList,
+            isValid: true,
+          }));
+        } else {
+          validationResultList.push(returnValue);
+        }
       }
+      // else (undefined / non-Result): silent skip, existing behavior.
     }
 
     this.#applyResults(targetElement, validationResultList);

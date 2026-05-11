@@ -1518,3 +1518,77 @@ describe('FormValidator coordinator wiring', () => {
     expect(onFormPending).not.toHaveBeenCalled();
   });
 });
+
+describe('FormValidator async validation routing', () => {
+  function setupAsyncForm(opts: {
+    validate: (target: Element, data: unknown, options?: { signal: AbortSignal }) => unknown;
+    onError?: (err: unknown) => FormValidatorValidationResult;
+    onPending?: (el: Element, p: boolean) => void;
+    onFormPending?: (p: boolean) => void;
+    onErrorChange?: (el: Element, msgs: string[], errors: unknown[]) => void;
+  }) {
+    document.body.innerHTML = '<form id="af"><input name="u" data-validation="async"/></form>';
+    const form5 = document.getElementById('af') as HTMLFormElement;
+    const validator = new FormValidator({
+      form: form5,
+      validatorDeclarations: {
+        async: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: opts.validate as never,
+          errorMessage: { '': 'invalid', error: 'failed to verify' },
+          onError: opts.onError,
+        },
+      },
+      onPendingChange: opts.onPending,
+      onFormPendingChange: opts.onFormPending,
+      onErrorMessageListChanged: opts.onErrorChange,
+    });
+    const input = form5.querySelector('input')!;
+    return { form: form5, input, validator };
+  }
+
+  test('Promise-returning validate routes through coordinator (pending callback fires)', () => {
+    const onPending = vi.fn();
+    const { input } = setupAsyncForm({
+      validate: () => new Promise(() => { /* never resolves */ }),
+      onPending,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(onPending).toHaveBeenCalledWith(input, true);
+  });
+
+  test('async result lands in error store and fires onErrorMessageListChanged', async () => {
+    const onErrorChange = vi.fn();
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const { input } = setupAsyncForm({
+      validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+      onErrorChange,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    const lastCall = onErrorChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toContain('invalid');
+  });
+
+  test('sync result on a slot with in-flight async aborts the in-flight (via injection)', () => {
+    let abortedFromInside = false;
+    const { input } = setupAsyncForm({
+      validate: (_t, _d, opts) => {
+        if (!opts) return new FormValidatorValidationResult({ isValid: true });
+        opts.signal.addEventListener('abort', () => { abortedFromInside = true; });
+        return new Promise(() => { /* never resolves */ });
+      },
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(abortedFromInside).toBe(false);
+
+    // Inject a result; per spec, this aborts the in-flight async for that (target, validator) slot.
+    input.dispatchEvent(FormValidator.createValidateEvent({
+      data: { async: new FormValidatorValidationResult({ isValid: true }) },
+    }));
+    expect(abortedFromInside).toBe(true);
+  });
+});
