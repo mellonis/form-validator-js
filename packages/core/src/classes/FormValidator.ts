@@ -849,6 +849,20 @@ export default class FormValidator {
     const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(targetElement);
 
     const validationResultList: FormValidatorValidationResult[] = [];
+
+    const pushResult = (r: FormValidatorValidationResult, name: string): void => {
+      r.validatorName = name;
+      if (this.ignoreValidationResult) {
+        validationResultList.push(new FormValidatorValidationResult({
+          ...r,
+          validatorSubtypeList: r.validatorSubtypeList,
+          isValid: true,
+        }));
+      } else {
+        validationResultList.push(r);
+      }
+    };
+
     for (const validatorName of validatorNameToContextMap.keys()) {
       const data = validatorNameToDataMap.get(validatorName);
       if (!data) continue;
@@ -857,17 +871,7 @@ export default class FormValidator {
       if (injected instanceof FormValidatorValidationResult) {
         // Injection path — abort any in-flight async for this slot first.
         this.#coordinator.abortSlot(targetElement, validatorName);
-        const stamped = injected;
-        stamped.validatorName = validatorName;
-        if (this.ignoreValidationResult) {
-          validationResultList.push(new FormValidatorValidationResult({
-            ...stamped,
-            validatorSubtypeList: stamped.validatorSubtypeList,
-            isValid: true,
-          }));
-        } else {
-          validationResultList.push(stamped);
-        }
+        pushResult(injected, validatorName);
         continue;
       }
 
@@ -893,16 +897,7 @@ export default class FormValidator {
       } else if (returnValue instanceof FormValidatorValidationResult) {
         // Sync result supersedes any in-flight async for this slot.
         this.#coordinator.abortSlot(targetElement, validatorName);
-        returnValue.validatorName = validatorName;
-        if (this.ignoreValidationResult) {
-          validationResultList.push(new FormValidatorValidationResult({
-            ...returnValue,
-            validatorSubtypeList: returnValue.validatorSubtypeList,
-            isValid: true,
-          }));
-        } else {
-          validationResultList.push(returnValue);
-        }
+        pushResult(returnValue, validatorName);
       }
       // else (undefined / non-Result): silent skip, existing behavior.
     }
