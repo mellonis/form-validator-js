@@ -6,6 +6,7 @@ import { FormValidator } from '@form-validator-js/core';
 import {
   required,
   minLength,
+  maxLength,
   equalsTo,
 } from '@form-validator-js/validators';
 
@@ -92,5 +93,48 @@ describe('README: minimal example (signup form)', () => {
       [confirm, ['must match']],
       [confirm, []],
     ]);
+  });
+});
+
+describe('README: validators quick-start (signin form)', () => {
+  test('blocks empty submit, allows submit when filled', () => {
+    document.body.innerHTML = `
+      <form id="signin">
+        <input id="email" name="email" type="email"
+               data-validation="required;maxLength(254)">
+        <input id="password" name="password" type="password"
+               data-validation="required;minLength(8)">
+        <p id="errors"></p>
+        <button>Sign in</button>
+      </form>
+    `;
+    const form = document.getElementById('signin') as HTMLFormElement;
+    const errors = document.getElementById('errors') as HTMLElement;
+
+    new FormValidator({
+      form,
+      validatorDeclarations: { required, minLength, maxLength },
+      onErrorMessageListChanged: (el, msgs) => {
+        if (el === form) return;
+        errors.textContent = msgs.join('; ');
+      },
+    });
+
+    // Empty → blocked.
+    const blocked = new Event('submit', { cancelable: true, bubbles: true });
+    form.dispatchEvent(blocked);
+    expect(blocked.defaultPrevented).toBe(true);
+
+    // Fill valid values.
+    const email = document.getElementById('email') as HTMLInputElement;
+    const password = document.getElementById('password') as HTMLInputElement;
+    email.value = 'alice@example.com';
+    password.value = 'super-secret-pass';
+    email.dispatchEvent(new Event('input', { bubbles: true }));
+    password.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const allowed = new Event('submit', { cancelable: true, bubbles: true });
+    form.dispatchEvent(allowed);
+    expect(allowed.defaultPrevented).toBe(false);
   });
 });
