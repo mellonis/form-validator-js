@@ -1722,3 +1722,89 @@ describe('FormValidator aria-busy management', () => {
     expect(fieldset.hasAttribute('aria-busy')).toBe(false);
   });
 });
+
+describe('FormValidator async submit flow', () => {
+  function asyncSubmitForm(opts: {
+    validate: () => Promise<FormValidatorValidationResult> | FormValidatorValidationResult;
+  }) {
+    document.body.innerHTML = '<form id="sf"><input name="u" data-validation="a"/><button type="submit">Go</button></form>';
+    const form11 = document.getElementById('sf') as HTMLFormElement;
+    new FormValidator({
+      form: form11,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: opts.validate as never,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    return form11;
+  }
+
+  test('submit blocked while async pending; preventDefault and stopImmediatePropagation called', () => {
+    const form12 = asyncSubmitForm({ validate: () => new Promise(() => {}) });
+    const after = vi.fn();
+    form12.addEventListener('submit', after);
+
+    const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
+    form12.dispatchEvent(submitEvent);
+    expect(submitEvent.defaultPrevented).toBe(true);
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  test('submit re-fires via requestSubmit after async resolves valid; AFTER-listener runs on resubmit', async () => {
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const form13 = asyncSubmitForm({
+      validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+    });
+    const after = vi.fn((e: Event) => e.preventDefault());
+    form13.addEventListener('submit', after);
+
+    form13.requestSubmit();
+    expect(after).not.toHaveBeenCalled();
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(after).toHaveBeenCalledTimes(1);
+  });
+
+  test('async resolves invalid: no resubmit, downstream submit listener does not fire', async () => {
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const form14 = asyncSubmitForm({
+      validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+    });
+    const after = vi.fn();
+    form14.addEventListener('submit', after);
+    form14.requestSubmit();
+
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  test('user edit during submit pending extends the wait', async () => {
+    let counter = 0;
+    let lastResolve!: (r: FormValidatorValidationResult) => void;
+    const form15 = asyncSubmitForm({
+      validate: () => {
+        counter += 1;
+        return new Promise<FormValidatorValidationResult>((res) => { lastResolve = res; });
+      },
+    });
+    const after = vi.fn();
+    form15.addEventListener('submit', after);
+
+    form15.requestSubmit(); // counter=1
+    const input = form15.querySelector('input')!;
+    input.dispatchEvent(new Event('input', { bubbles: true })); // counter=2 (cycle replaced)
+
+    lastResolve(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(counter).toBeGreaterThanOrEqual(2);
+  });
+});

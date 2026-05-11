@@ -251,6 +251,12 @@ export default class FormValidator {
 
   readonly #coordinator: AsyncValidationCoordinator;
 
+  #submitPending = false;
+
+  #submitSubmitter: HTMLElement | null = null;
+
+  #allowNextSubmit = false;
+
   constructor({
     form,
     validatorDeclarations = {},
@@ -616,7 +622,10 @@ export default class FormValidator {
       // input event:
       if (effective === 'input') return true;
       if (effective === 'blur-then-input') {
-        return this.#fieldsShownError.has(field as FormElement);
+        // While a submit is pending (async validation in flight from a submit
+        // attempt), any user edit should immediately re-trigger validation so
+        // the pending result reflects the latest value.
+        return this.#submitPending || this.#fieldsShownError.has(field as FormElement);
       }
       return false; // 'blur' mode: only focusout fires
     };
@@ -813,17 +822,36 @@ export default class FormValidator {
   #submitEventHandler = (event: Event): void => {
     if (event.target !== this.#form) return;
 
+    if (this.#allowNextSubmit) {
+      this.#allowNextSubmit = false;
+      return; // post-resolution requestSubmit re-entry — let through.
+    }
+
+    const submitter = (event as SubmitEvent).submitter ?? null;
+
     this.#getValidationTargets().forEach((element) => {
       element.dispatchEvent(FormValidator.createValidateEvent());
     });
 
-    if (this.#hasErrors()) {
-      event.stopImmediatePropagation();
-      event.preventDefault();
+    const hasErrorsNow = this.#hasErrors();
+    const hasPending = this.#coordinator.hasPending();
+
+    if (!hasErrorsNow && !hasPending) {
+      return; // existing path: all sync valid, let event proceed.
+    }
+
+    event.stopImmediatePropagation();
+    event.preventDefault();
+
+    if (hasPending) {
+      this.#submitPending = true;
+      this.#submitSubmitter = submitter;
+      // resolution will happen via #checkSubmitHandoff once pendingCount hits 0.
+    } else {
+      // Surface the browser's native tooltip on the first invalid field.
+      // With `manageValidity: true` (default), the message comes from our
+      // setCustomValidity calls; otherwise from any native HTML validity.
       if (this.#reportValidityOnSubmit) {
-        // Surface the browser's native tooltip on the first invalid field.
-        // With `manageValidity: true` (default), the message comes from our
-        // setCustomValidity calls; otherwise from any native HTML validity.
         this.#form.reportValidity();
       }
     }
@@ -843,7 +871,23 @@ export default class FormValidator {
   };
 
   #checkSubmitHandoff = (): void => {
-    // Filled in Task 16.
+    if (!this.#submitPending) return;
+    if (this.#coordinator.hasPending()) return;
+    this.#resolveSubmitPending();
+  };
+
+  #resolveSubmitPending = (): void => {
+    this.#submitPending = false;
+    const submitter = this.#submitSubmitter;
+    this.#submitSubmitter = null;
+
+    if (this.#hasErrors()) {
+      if (this.#reportValidityOnSubmit) this.#form.reportValidity();
+      return;
+    }
+
+    this.#allowNextSubmit = true;
+    this.#form.requestSubmit(submitter ?? undefined);
   };
 
   #validateEventHandler = (event: CustomEvent): void => {
