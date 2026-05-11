@@ -255,6 +255,26 @@ describe('AsyncValidationCoordinator T1 replace path', () => {
     expect(callbacks.onApplyResult).toHaveBeenCalledWith(el, 'x', newResult);
     expect(callbacks.onApplyResult).toHaveBeenCalledTimes(1);
   });
+
+  test('new cycle rejecting on the replace path routes through handleReject (default failure)', async () => {
+    const { c, callbacks } = makeCoordinator();
+    const el = document.createElement('input');
+    const dOld = deferred<FormValidatorValidationResult>();
+    const dNew = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', dOld.promise, new AbortController());
+    c.startCycle(el, 'x', dNew.promise, new AbortController());
+
+    dNew.reject(new Error('boom'));
+    await flushMicrotasks();
+
+    const calls = callbacks.onApplyResult.mock.calls.filter(
+      (args: unknown[]) => args[0] === el && args[1] === 'x',
+    );
+    expect(calls).toHaveLength(1);
+    const result = calls[0][2] as FormValidatorValidationResult;
+    expect(result.isValid).toBe(false);
+    expect(result.validatorSubtypeList).toEqual(['error']);
+  });
 });
 
 describe('AsyncValidationCoordinator stale generation drops', () => {

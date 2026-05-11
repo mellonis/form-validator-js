@@ -1966,6 +1966,60 @@ describe('FormValidator.retry', () => {
     const input = form20.querySelector('input')!;
     expect(() => v.retry(input, 'nonexistent')).toThrow(/not declared/);
   });
+
+  test('retry(el, name) throws when element is not a known validation target', () => {
+    document.body.innerHTML = '<form id="rt4"><input name="u" data-validation="a"/></form><div id="d"></div>';
+    const form21 = document.getElementById('rt4') as HTMLFormElement;
+    const div = document.getElementById('d') as HTMLDivElement;
+    const v = new FormValidator({
+      form: form21,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: true }),
+          errorMessage: 'a',
+        },
+      },
+    });
+    expect(() => v.retry(div, 'a')).toThrow(/not a known validation target/);
+  });
+
+  test('retry(el, name) with async validator routes through coordinator', async () => {
+    document.body.innerHTML = '<form id="rt5"><input name="u" data-validation="a"/></form>';
+    const form22 = document.getElementById('rt5') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const validate = vi.fn(() => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }));
+    const onPending = vi.fn();
+    const v = new FormValidator({
+      form: form22,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+      onPendingChange: onPending,
+    });
+    const input = form22.querySelector('input')!;
+
+    // Settle the initial cycle so the slot is clean.
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    validate.mockClear();
+    onPending.mockClear();
+    v.retry(input, 'a');
+
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(onPending).toHaveBeenCalledWith(input, true);
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 });
 
 describe('FormValidator ignoreValidationResult + async', () => {
