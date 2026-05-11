@@ -29,6 +29,13 @@ export type ElementType =
 
 export type ErrorMessage = string | Record<string, string>;
 
+export interface ErrorDetail {
+  validatorName: string;
+  subtype: string;
+  message: string;
+  isContextError: boolean;
+}
+
 export type ValidatorInitFunction = (
   target: FormElement,
   params: { argumentString: string },
@@ -37,12 +44,14 @@ export type ValidatorInitFunction = (
 export type ValidatorValidateFunction = (
   target: FormElement,
   data: Record<string, unknown>,
-) => FormValidatorValidationResult | undefined;
+  options?: { signal: AbortSignal },
+) => FormValidatorValidationResult | Promise<FormValidatorValidationResult> | undefined;
 
 export interface ValidatorDeclaration {
   init?: ValidatorInitFunction;
   validate?: ValidatorValidateFunction;
   errorMessage?: ErrorMessage;
+  onError?: (err: unknown) => FormValidatorValidationResult;
 }
 
 export type ValidatorDeclarations = Record<string, ValidatorDeclaration>;
@@ -53,6 +62,7 @@ export interface FormValidatorParams {
   onErrorMessageListChanged?: (
     element: Element,
     errorMessages: string[],
+    errors: ErrorDetail[],
   ) => void;
   /**
    * Whether the engine should call `target.setCustomValidity(...)` on form
@@ -91,6 +101,17 @@ export interface FormValidatorParams {
    * Submit-time validation always runs regardless.
    */
   trigger?: TriggerMode;
+  /**
+   * Fires when an element's pending state flips between "no async in flight"
+   * and "at least one async in flight" (aggregated across all validators on
+   * that element). Used for per-field "checking…" UI.
+   */
+  onPendingChange?: (element: Element, isPending: boolean) => void;
+  /**
+   * Fires when the form-level pending state flips. Used for disabling the
+   * submit button while any async check is in flight.
+   */
+  onFormPendingChange?: (isPending: boolean) => void;
 }
 
 export type TriggerMode = 'input' | 'blur' | 'blur-then-input' | 'submit-only';
@@ -189,6 +210,7 @@ export default class FormValidator {
   readonly #onErrorMessageListChanged: (
     element: Element,
     errorMessages: string[],
+    errors: ErrorDetail[],
   ) => void;
 
   readonly #manageValidity: boolean;
@@ -218,6 +240,8 @@ export default class FormValidator {
     manageValidity = true,
     reportValidityOnSubmit = false,
     trigger = 'blur-then-input',
+    onPendingChange: _onPendingChange = () => {},
+    onFormPendingChange: _onFormPendingChange = () => {},
   }: FormValidatorParams) {
     if (!(form instanceof HTMLFormElement)) {
       throw new Error('form must be an HTMLFormElement');
@@ -680,7 +704,7 @@ export default class FormValidator {
         this.#elementToErrorListMap.set(element, []);
         this.#clearAriaInvalid(element);
         this.#clearCustomValidity(element);
-        this.#onErrorMessageListChanged(element, []);
+        this.#onErrorMessageListChanged(element, [], []);
       }
       // Returns all fields to "untouched" — subsequent input won't fire
       // validation in 'blur-then-input' mode until each field is shown an error again.
@@ -736,7 +760,7 @@ export default class FormValidator {
       const data = validatorNameToDataMap.get(validatorName);
       if (!data) continue;
 
-      let validationResult: FormValidatorValidationResult | undefined;
+      let validationResult: FormValidatorValidationResult | Promise<FormValidatorValidationResult> | undefined;
 
       const injected = eventData[validatorName];
       if (injected instanceof FormValidatorValidationResult) {
@@ -794,7 +818,7 @@ export default class FormValidator {
       if (!sameContents) {
         this.#syncAriaInvalid(element, after.length > 0);
         this.#syncCustomValidity(element, after);
-        this.#onErrorMessageListChanged(element, after);
+        this.#onErrorMessageListChanged(element, after, []);
       }
     }
 

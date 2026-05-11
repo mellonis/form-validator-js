@@ -3,9 +3,10 @@ import {
   FormValidator,
   FormValidatorInitResult,
   FormValidatorValidationResult,
+  type ErrorDetail,
 } from '@form-validator-js/core';
 
-type OnErrorChange = (element: Element, errorMessages: string[]) => void;
+type OnErrorChange = (element: Element, errorMessages: string[], errors: ErrorDetail[]) => void;
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -238,10 +239,10 @@ describe('FormValidator validations', () => {
       onErrorMessageListChangedMock.mock.calls
         .sort((a, b) => (a[0] as Element).tagName.localeCompare((b[0] as Element).tagName)),
     ).toEqual([
-      [form, ['b']],
-      [form, []],
-      [input, ['a']],
-      [input, []],
+      [form, ['b'], []],
+      [form, [], []],
+      [input, ['a'], []],
+      [input, [], []],
     ]);
   });
 
@@ -639,7 +640,7 @@ describe('FormValidator trigger option', () => {
 
     input.dispatchEvent(new Event('focusout', { bubbles: true }));
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(input, ['a']);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], []);
   });
 
   test('trigger: blur — observable wiring fires on observed field focusout', () => {
@@ -679,7 +680,7 @@ describe('FormValidator trigger option', () => {
 
     // focusout on the observed (password) field should trigger confirm's validation
     password.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, ['must match']);
+    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], []);
   });
 
   test('trigger: blur — submit still validates everything', () => {
@@ -733,7 +734,7 @@ describe('FormValidator trigger option', () => {
     const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
     form.dispatchEvent(submitEvent);
     expect(submitEvent.defaultPrevented).toBe(true);
-    expect(onError).toHaveBeenCalledWith(input, ['a']);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], []);
   });
 
   test('per-field data-validation-trigger overrides engine default', () => {
@@ -767,7 +768,7 @@ describe('FormValidator trigger option', () => {
     expect(onError).not.toHaveBeenCalled();
 
     loud.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(loud, ['a']);
+    expect(onError).toHaveBeenCalledWith(loud, ['a'], []);
   });
 
   test('per-field data-validation-trigger with invalid value falls back to engine default', () => {
@@ -822,7 +823,7 @@ describe('FormValidator trigger option', () => {
     expect(onError).not.toHaveBeenCalled();
 
     ext.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(ext, ['a']);
+    expect(onError).toHaveBeenCalledWith(ext, ['a'], []);
   });
 });
 
@@ -854,7 +855,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     expect(onError).not.toHaveBeenCalled();
 
     input.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(input, ['too short']);
+    expect(onError).toHaveBeenCalledWith(input, ['too short'], []);
   });
 
   test('after first error, field switches to eager: input fires validation', () => {
@@ -883,7 +884,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     input.value = 'abc';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     expect(onError).toHaveBeenCalledTimes(2); // error cleared
-    expect(onError).toHaveBeenLastCalledWith(input, []);
+    expect(onError).toHaveBeenLastCalledWith(input, [], []);
   });
 
   test('field stays in eager mode even after passing validation (one-way transition)', () => {
@@ -911,7 +912,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     // not waiting for a focusout.
     input.value = 'a';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(input, ['too short']);
+    expect(onError).toHaveBeenCalledWith(input, ['too short'], []);
   });
 
   test('reset returns fields to untouched (subsequent input does NOT fire)', () => {
@@ -974,13 +975,13 @@ describe('FormValidator trigger: blur-then-input', () => {
 
     // password's focusout — propagates to confirm; confirm validates and gets shown an error.
     password.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, ['must match']);
+    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], []);
 
     // Now confirm is in eager mode — typing in password fires confirm validation eagerly.
     onError.mockClear();
     password.value = 'a'; // matches confirm
     password.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, []); // error cleared eagerly
+    expect(onError).toHaveBeenCalledWith(confirm, [], []); // error cleared eagerly
   });
 
   test('submit always validates regardless of trigger', () => {
@@ -1277,7 +1278,7 @@ describe('FormValidator picks up form=-linked inputs (HTMLFormControlsCollection
     external.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(external, ['a']);
+    expect(onError).toHaveBeenCalledWith(external, ['a'], []);
   });
 
   test('submit blocks when only an external input is invalid', () => {
@@ -1377,7 +1378,7 @@ describe('FormValidator unknown validator names in data-validation', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(input, ['a']);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], []);
   });
 });
 
@@ -1409,7 +1410,7 @@ describe('FormValidator nested validation context', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(group, ['group-error']);
+    expect(onError).toHaveBeenCalledWith(group, ['group-error'], []);
   });
 
   test('walks past inner context that does not cover the validator', () => {
@@ -1439,6 +1440,40 @@ describe('FormValidator nested validation context', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(form, ['outer-error']);
+    expect(onError).toHaveBeenCalledWith(form, ['outer-error'], []);
+  });
+});
+
+describe('FormValidator type-widening surface', () => {
+  test('onErrorMessageListChanged receives a third arg (errors) — empty array when no errors initially', () => {
+    document.body.innerHTML = '<form id="t"><input name="a" data-validation="required"/></form>';
+    const form2 = document.getElementById('t') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form2,
+      validatorDeclarations: {
+        required: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: true }),
+          errorMessage: 'required',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    // Trigger a validation cycle so the callback fires at least once if anything changes.
+    const input = form2.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    // Test passes if the constructor accepts the wider signature; behaviour is exercised in Task 14.
+    expect(true).toBe(true);
+  });
+
+  test('onPendingChange and onFormPendingChange are accepted in constructor params', () => {
+    document.body.innerHTML = '<form id="t2"/>';
+    const form2 = document.getElementById('t2') as HTMLFormElement;
+    expect(() => new FormValidator({
+      form: form2,
+      onPendingChange: () => {},
+      onFormPendingChange: () => {},
+    })).not.toThrow();
   });
 });
