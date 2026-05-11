@@ -176,25 +176,147 @@ validator.elementToSpecificErrorMessageMap.delete(usernameInput);
 validator.elementToSpecificErrorMessageMap.clear();
 ```
 
-## Injecting validation results (async checks)
+## Async validation
 
-For async or server-side checks (uniqueness, captcha, virus scan), dispatch a validation event via `FormValidator.createValidateEvent` and supply the result inline:
+Validators may return a `Promise<FormValidatorValidationResult>` instead of a synchronous result. The engine tracks each in-flight (target, validator) cycle, exposes pending state for UX, and blocks form submission until all async checks resolve.
+
+### Defining an async validator
 
 ```ts
-import { FormValidator, FormValidatorValidationResult } from '@form-validator-js/core';
+import { FormValidator, FormValidatorValidationResult, ValidatorDeclarations } from '@form-validator-js/core';
 
-async function checkUsernameUniqueness(value: string) {
-  const taken = await fetch(`/api/username-available?u=${value}`).then((r) => r.json());
-
-  usernameInput.dispatchEvent(FormValidator.createValidateEvent({
-    data: {
-      uniqueUsername: new FormValidatorValidationResult({ isValid: !taken }),
+const validators: ValidatorDeclarations = {
+  uniqueUsername: {
+    init: (target) => ({ observableElementList: [target], extraData: {} }),
+    async validate(target, _data, { signal }) {
+      const value = (target as HTMLInputElement).value;
+      if (value.length < 3) {
+        return new FormValidatorValidationResult({ isValid: false });
+      }
+      const r = await fetch(`/api/username-available?u=${encodeURIComponent(value)}`, { signal });
+      const taken = (await r.json()).taken;
+      return new FormValidatorValidationResult({ isValid: !taken });
     },
-  }));
+    errorMessage: { '': 'Username taken', error: 'Could not verify, try again' },
+  },
+};
+```
+
+The third arg `{ signal }` is an `AbortSignal` the engine controls. Wire it into your `fetch` (and any other awaitable resource) so cancellation propagates when the engine aborts the cycle — e.g. when the user types another character.
+
+### Cancellation: race-by-latest + AbortSignal
+
+Whenever a new cycle starts for the same `(target, validatorName)`, the engine aborts the previous controller and bumps an internal generation. Stale Promises that resolve late (because the user ignored the signal) are silently dropped — race-by-latest correctness is guaranteed regardless of whether you honor the signal. Honoring it is the polite thing to do (frees server work, cancels in-flight HTTP requests, lets you free heavy local resources).
+
+### Debounce: a recipe, not a feature
+
+The library does not debounce on your behalf. Compose it inside your validate function, and wire the signal into both the wait and the fetch:
+
+```ts
+async function uniqueUsernameValidate(target, _data, { signal }) {
+  await wait(300, signal);
+  const r = await fetch(url(target), { signal });
+  return new FormValidatorValidationResult({ isValid: !(await r.json()).taken });
+}
+
+function wait(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => {
+      clearTimeout(t);
+      reject(new DOMException('Aborted', 'AbortError'));
+    });
+  });
 }
 ```
 
-The injected result is used for that validator on that one event instead of running its `validate` function.
+> **Important:** wire the signal into the `wait` *and* the `fetch`. If you skip the wait, every keystroke will fire a real fetch even though only the latest result counts.
+
+### Pending state: per-element and form-level
+
+Two new optional callbacks expose pending state:
+
+```ts
+new FormValidator({
+  form,
+  validatorDeclarations: validators,
+  onPendingChange: (element, isPending) => {
+    spinnerFor(element).hidden = !isPending;
+  },
+  onFormPendingChange: (isPending) => {
+    submitButton.disabled = isPending;
+  },
+});
+```
+
+The engine also automatically sets `aria-busy="true"` on form-control elements while at least one validator on them is pending (removed on resolution). Skipped for non-form-control targets, mirroring the engine's `aria-invalid` scope.
+
+### Failure handling
+
+If an async validate rejects with anything other than `AbortError`, the engine records a synthetic invalid result with `validatorSubtypeList: ['error']`. Provide a message for the reserved `'error'` subtype to surface it:
+
+```ts
+errorMessage: { '': 'Username taken', error: 'Could not verify, try again' }
+```
+
+For finer-grained error mapping, declare an `onError` hook on the validator:
+
+```ts
+{
+  validate: async (...) => { /* may throw rate-limited, timeout, server-down, ... */ },
+  onError: (err) => {
+    if (err instanceof MyRateLimitedError) {
+      return new FormValidatorValidationResult({ isValid: false, validatorSubtypeList: ['rateLimited'] });
+    }
+    return new FormValidatorValidationResult({ isValid: false, validatorSubtypeList: ['error'] });
+  },
+  errorMessage: { rateLimited: 'Too many checks; please wait', error: 'Could not verify, try again' },
+}
+```
+
+### Retrying after async failure
+
+`onErrorMessageListChanged` now receives a third arg, `errors: ErrorDetail[]`, parallel to `msgs`. Each `ErrorDetail` is `{ validatorName, subtype, message, isContextError }`. Detect failure structurally on the `(validatorName, subtype)` tuple — never on rendered text:
+
+```ts
+new FormValidator({
+  form,
+  validatorDeclarations: validators,
+  onErrorMessageListChanged: (el, _msgs, errors) => {
+    const failed = errors.some(
+      (e) => e.validatorName === 'uniqueUsername' && e.subtype === 'error',
+    );
+    retryButtonFor(el).hidden = !failed;
+  },
+});
+
+retryBtn.addEventListener('click', () => validator.retry(usernameField, 'uniqueUsername'));
+```
+
+`validator.retry(element, validatorName)` re-runs only that validator on that element, leaving other validators' recorded results untouched. `validator.retry(element)` (no name) re-runs every validator on the element — a convenience equivalent to dispatching a fresh validate event.
+
+### Submit semantics
+
+When the user submits a form with async validators in flight, the engine calls `event.stopImmediatePropagation()` and `event.preventDefault()`, then waits for resolution:
+
+- **All async resolves valid** → engine programmatically calls `form.requestSubmit(submitter)` (preserving the original submitter); the form submits normally and any `submit` listeners registered after `new FormValidator(...)` fire on the resubmit.
+- **Any async resolves invalid** → submit stays blocked; errors are already in the store via `onErrorMessageListChanged`.
+
+A submit listener registered *before* `new FormValidator(...)` cannot rely on `form.checkValidity()` reflecting the final verdict — async hasn't started yet at that point. If those listeners care about the final result, subscribe to `onFormPendingChange` and `onErrorMessageListChanged` instead.
+
+If the user clicks submit again while pending, each click restarts the in-flight async (via the abort/replace rules); the latest `submitter` wins. If the user edits a field while submit is pending, the new edit triggers a fresh cycle and the submit waits for that one. If the user resets the form, all in-flight is aborted and the submit attempt is silently abandoned.
+
+### Injecting an externally-computed result
+
+The original injection pattern still works — useful when your code fully owns the async lifecycle (e.g. a captcha widget you control externally). Dispatch a validate event with a precomputed result:
+
+```ts
+field.dispatchEvent(FormValidator.createValidateEvent({
+  data: { uniqueUsername: new FormValidatorValidationResult({ isValid: !taken }) },
+}));
+```
+
+The injected result is used for that validator on that one event instead of running its `validate` function. If an async cycle for the same slot is in-flight, it is aborted and the injected result wins.
 
 ## Validation timing
 
