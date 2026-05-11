@@ -47,7 +47,15 @@ export default class AsyncValidationCoordinator {
     const previous = inner?.get(name);
 
     if (previous) {
-      // Replace path — implemented in Task 4.
+      previous.controller.abort();
+      const newGeneration = previous.generation + 1;
+      // inner is non-null here because previous was found inside inner.
+      inner!.set(name, { generation: newGeneration, controller });
+      promise.then(
+        (result) => this.#handleResolve(element, name, newGeneration, result),
+        // T3 (reject handler) implemented in Task 5; until then, a rejection is silently dropped.
+        (_err) => { /* T3 implemented in Task 5 */ },
+      );
       return;
     }
 

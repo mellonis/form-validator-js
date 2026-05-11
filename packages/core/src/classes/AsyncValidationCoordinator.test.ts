@@ -159,3 +159,56 @@ describe('AsyncValidationCoordinator T2 resolve', () => {
     expect(c.hasPending()).toBe(true);
   });
 });
+
+describe('AsyncValidationCoordinator T1 replace path', () => {
+  test('startCycle on existing slot aborts previous, bumps generation, no counter change, no callbacks', () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const ctrl1 = new AbortController();
+    const ctrl2 = new AbortController();
+    c.startCycle(el, 'x', deferred<FormValidatorValidationResult>().promise, ctrl1);
+    callbacks.onElementPendingChange.mockClear();
+    callbacks.onFormPendingChange.mockClear();
+
+    expect(ctrl1.signal.aborted).toBe(false);
+    c.startCycle(el, 'x', deferred<FormValidatorValidationResult>().promise, ctrl2);
+
+    expect(ctrl1.signal.aborted).toBe(true);
+    expect(callbacks.onElementPendingChange).not.toHaveBeenCalled();
+    expect(callbacks.onFormPendingChange).not.toHaveBeenCalled();
+    expect(c.hasPending()).toBe(true);
+    expect(c.hasPendingFor(el)).toBe(true);
+  });
+
+  test('after replace, only the new generation resolve applies', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const dOld = deferred<FormValidatorValidationResult>();
+    const dNew = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', dOld.promise, new AbortController());
+    c.startCycle(el, 'x', dNew.promise, new AbortController());
+
+    const oldResult = new FormValidatorValidationResult({ isValid: true });
+    const newResult = new FormValidatorValidationResult({ isValid: false });
+    dOld.resolve(oldResult);
+    await flushMicrotasks();
+    expect(callbacks.onApplyResult).not.toHaveBeenCalledWith(el, 'x', oldResult);
+
+    dNew.resolve(newResult);
+    await flushMicrotasks();
+    expect(callbacks.onApplyResult).toHaveBeenCalledWith(el, 'x', newResult);
+    expect(callbacks.onApplyResult).toHaveBeenCalledTimes(1);
+  });
+});
