@@ -319,3 +319,55 @@ describe('AsyncValidationCoordinator abortSlot', () => {
     expect(callbacks.onFormPendingChange).not.toHaveBeenCalled();
   });
 });
+
+describe('AsyncValidationCoordinator abortAll', () => {
+  test('abortAll aborts every controller, fires per-element and form callbacks, clears state', () => {
+    const { c, callbacks } = makeCoordinator();
+    const elA = document.createElement('input');
+    const elB = document.createElement('input');
+    const ctrlA = new AbortController();
+    const ctrlB1 = new AbortController();
+    const ctrlB2 = new AbortController();
+    c.startCycle(elA, 'x', deferred<FormValidatorValidationResult>().promise, ctrlA);
+    c.startCycle(elB, 'x', deferred<FormValidatorValidationResult>().promise, ctrlB1);
+    c.startCycle(elB, 'y', deferred<FormValidatorValidationResult>().promise, ctrlB2);
+    callbacks.onElementPendingChange.mockClear();
+    callbacks.onFormPendingChange.mockClear();
+
+    c.abortAll();
+
+    expect(ctrlA.signal.aborted).toBe(true);
+    expect(ctrlB1.signal.aborted).toBe(true);
+    expect(ctrlB2.signal.aborted).toBe(true);
+    expect(c.hasPending()).toBe(false);
+    expect(c.hasPendingFor(elA)).toBe(false);
+    expect(c.hasPendingFor(elB)).toBe(false);
+    expect(callbacks.onElementPendingChange).toHaveBeenCalledWith(elA, false);
+    expect(callbacks.onElementPendingChange).toHaveBeenCalledWith(elB, false);
+    expect(callbacks.onElementPendingChange).toHaveBeenCalledTimes(2); // one per element
+    expect(callbacks.onFormPendingChange).toHaveBeenCalledWith(false);
+    expect(callbacks.onFormPendingChange).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSlotResolved).not.toHaveBeenCalled();
+  });
+
+  test('abortAll on empty coordinator is a no-op', () => {
+    const { c, callbacks } = makeCoordinator();
+    expect(() => c.abortAll()).not.toThrow();
+    expect(callbacks.onElementPendingChange).not.toHaveBeenCalled();
+    expect(callbacks.onFormPendingChange).not.toHaveBeenCalled();
+  });
+
+  test('AbortError microtask after abortAll drops silently (no negative counter)', async () => {
+    const { c, callbacks } = makeCoordinator();
+    const el = document.createElement('input');
+    const d = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', d.promise, new AbortController());
+
+    c.abortAll();
+    d.reject(new DOMException('Aborted', 'AbortError'));
+    await flushMicrotasks();
+
+    expect(c.hasPending()).toBe(false);
+    expect(callbacks.onApplyResult).not.toHaveBeenCalled();
+  });
+});

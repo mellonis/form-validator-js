@@ -116,6 +116,26 @@ export default class AsyncValidationCoordinator {
     // not natural slot completion; submit hand-off should not trigger.
   }
 
+  abortAll(): void {
+    if (this.#pendingCount === 0) return;
+
+    const elementsToNotify: Element[] = [];
+    for (const [element, inner] of this.#asyncInFlight) {
+      for (const { controller } of inner.values()) {
+        controller.abort();
+      }
+      elementsToNotify.push(element);
+    }
+
+    this.#asyncInFlight.clear();
+    this.#pendingCount = 0;
+
+    for (const element of elementsToNotify) {
+      this.#callbacks.onElementPendingChange(element, false);
+    }
+    this.#callbacks.onFormPendingChange(false);
+  }
+
   #handleReject(
     element: Element,
     name: string,
