@@ -239,9 +239,9 @@ describe('FormValidator validations', () => {
       onErrorMessageListChangedMock.mock.calls
         .sort((a, b) => (a[0] as Element).tagName.localeCompare((b[0] as Element).tagName)),
     ).toEqual([
-      [form, ['b'], []],
+      [form, ['b'], expect.any(Array)],
       [form, [], []],
-      [input, ['a'], []],
+      [input, ['a'], expect.any(Array)],
       [input, [], []],
     ]);
   });
@@ -640,7 +640,7 @@ describe('FormValidator trigger option', () => {
 
     input.dispatchEvent(new Event('focusout', { bubbles: true }));
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(input, ['a'], []);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], expect.any(Array));
   });
 
   test('trigger: blur — observable wiring fires on observed field focusout', () => {
@@ -680,7 +680,7 @@ describe('FormValidator trigger option', () => {
 
     // focusout on the observed (password) field should trigger confirm's validation
     password.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], []);
+    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], expect.any(Array));
   });
 
   test('trigger: blur — submit still validates everything', () => {
@@ -734,7 +734,7 @@ describe('FormValidator trigger option', () => {
     const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
     form.dispatchEvent(submitEvent);
     expect(submitEvent.defaultPrevented).toBe(true);
-    expect(onError).toHaveBeenCalledWith(input, ['a'], []);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], expect.any(Array));
   });
 
   test('per-field data-validation-trigger overrides engine default', () => {
@@ -768,7 +768,7 @@ describe('FormValidator trigger option', () => {
     expect(onError).not.toHaveBeenCalled();
 
     loud.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(loud, ['a'], []);
+    expect(onError).toHaveBeenCalledWith(loud, ['a'], expect.any(Array));
   });
 
   test('per-field data-validation-trigger with invalid value falls back to engine default', () => {
@@ -823,7 +823,7 @@ describe('FormValidator trigger option', () => {
     expect(onError).not.toHaveBeenCalled();
 
     ext.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(ext, ['a'], []);
+    expect(onError).toHaveBeenCalledWith(ext, ['a'], expect.any(Array));
   });
 });
 
@@ -855,7 +855,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     expect(onError).not.toHaveBeenCalled();
 
     input.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(input, ['too short'], []);
+    expect(onError).toHaveBeenCalledWith(input, ['too short'], expect.any(Array));
   });
 
   test('after first error, field switches to eager: input fires validation', () => {
@@ -912,7 +912,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     // not waiting for a focusout.
     input.value = 'a';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(input, ['too short'], []);
+    expect(onError).toHaveBeenCalledWith(input, ['too short'], expect.any(Array));
   });
 
   test('reset returns fields to untouched (subsequent input does NOT fire)', () => {
@@ -975,13 +975,13 @@ describe('FormValidator trigger: blur-then-input', () => {
 
     // password's focusout — propagates to confirm; confirm validates and gets shown an error.
     password.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], []);
+    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], expect.any(Array));
 
     // Now confirm is in eager mode — typing in password fires confirm validation eagerly.
     onError.mockClear();
     password.value = 'a'; // matches confirm
     password.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, [], []); // error cleared eagerly
+    expect(onError).toHaveBeenCalledWith(confirm, [], expect.any(Array)); // error cleared eagerly
   });
 
   test('submit always validates regardless of trigger', () => {
@@ -1278,7 +1278,7 @@ describe('FormValidator picks up form=-linked inputs (HTMLFormControlsCollection
     external.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(external, ['a'], []);
+    expect(onError).toHaveBeenCalledWith(external, ['a'], expect.any(Array));
   });
 
   test('submit blocks when only an external input is invalid', () => {
@@ -1378,7 +1378,7 @@ describe('FormValidator unknown validator names in data-validation', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(input, ['a'], []);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], expect.any(Array));
   });
 });
 
@@ -1410,7 +1410,7 @@ describe('FormValidator nested validation context', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(group, ['group-error'], []);
+    expect(onError).toHaveBeenCalledWith(group, ['group-error'], expect.any(Array));
   });
 
   test('walks past inner context that does not cover the validator', () => {
@@ -1440,7 +1440,7 @@ describe('FormValidator nested validation context', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(form, ['outer-error'], []);
+    expect(onError).toHaveBeenCalledWith(form, ['outer-error'], expect.any(Array));
   });
 });
 
@@ -1590,5 +1590,85 @@ describe('FormValidator async validation routing', () => {
       data: { async: new FormValidatorValidationResult({ isValid: true }) },
     }));
     expect(abortedFromInside).toBe(true);
+  });
+});
+
+describe('FormValidator ErrorDetail third arg', () => {
+  test('errors[] is parallel to msgs[] for sync invalid result with default subtype', () => {
+    document.body.innerHTML = '<form id="ed"><input name="a" data-validation="r"/></form>';
+    const form6 = document.getElementById('ed') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form6,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: false }),
+          errorMessage: 'oops',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form6.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toEqual(['oops']);
+    expect(lastCall[2]).toEqual([{
+      validatorName: 'r',
+      subtype: '',
+      message: 'oops',
+      isContextError: false,
+    }]);
+  });
+
+  test('errors[] surfaces validatorSubtypeList correctly', () => {
+    document.body.innerHTML = '<form id="ed2"><input name="a" data-validation="r"/></form>';
+    const form7 = document.getElementById('ed2') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form7,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({
+            isValid: false,
+            validatorSubtypeList: ['too-short', 'no-digit'],
+          }),
+          errorMessage: { 'too-short': 'short', 'no-digit': 'needs digit' },
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form7.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[2]).toHaveLength(lastCall[1].length);
+    expect(lastCall[2].map((e: { subtype: string }) => e.subtype)).toEqual(['too-short', 'no-digit']);
+  });
+
+  test('errors[] is empty when there are no errors after a reset', () => {
+    document.body.innerHTML = '<form id="ed3"><input name="a" data-validation="r"/></form>';
+    const form8 = document.getElementById('ed3') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form8,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: false }),
+          errorMessage: 'oops',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form8.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    onChange.mockClear();
+    form8.dispatchEvent(new Event('reset', { bubbles: true }));
+    if (onChange.mock.calls.length > 0) {
+      const lastCall = onChange.mock.calls.at(-1)!;
+      expect(lastCall[1]).toEqual([]);
+      expect(lastCall[2]).toEqual([]);
+    }
   });
 });

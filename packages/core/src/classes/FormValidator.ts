@@ -135,6 +135,7 @@ interface ValidationError {
   validatorName: string;
   subtype: string;
   message: string | null;
+  isContextError: boolean;
 }
 
 interface TargetStorage {
@@ -192,6 +193,15 @@ function getErrorMessageList(errorList: ValidationError[]): string[] {
   return errorList
     .map((error) => error.message)
     .filter((message): message is string => message != null && message.length > 0);
+}
+
+function buildErrorDetailList(errorList: ValidationError[]): ErrorDetail[] {
+  const out: ErrorDetail[] = [];
+  for (const { validatorName, subtype, message, isContextError } of errorList) {
+    if (message == null || message.length === 0) continue;
+    out.push({ validatorName, subtype, message, isContextError });
+  }
+  return out;
 }
 
 export default class FormValidator {
@@ -508,6 +518,7 @@ export default class FormValidator {
         validatorName,
         subtype,
         message: messages[subtype] ?? null,
+        isContextError: validationResult.isContextError,
       });
     }
   };
@@ -714,7 +725,11 @@ export default class FormValidator {
       if (!sameContents) {
         this.#syncAriaInvalid(element, after.length > 0);
         this.#syncCustomValidity(element, after);
-        this.#onErrorMessageListChanged(element, after, []);
+        this.#onErrorMessageListChanged(
+          element,
+          after,
+          buildErrorDetailList(this.#elementToErrorListMap.get(element) ?? []),
+        );
       }
     }
 
