@@ -2,22 +2,23 @@ import AsyncValidationCoordinator from './AsyncValidationCoordinator';
 import FormValidatorValidationResult from './FormValidatorValidationResult';
 
 function makeCoordinator() {
-  return new AsyncValidationCoordinator({
+  const callbacks = {
     onApplyResult: vi.fn(),
     onElementPendingChange: vi.fn(),
     onFormPendingChange: vi.fn(),
     onSlotResolved: vi.fn(),
-  });
+  };
+  return { c: new AsyncValidationCoordinator(callbacks), callbacks };
 }
 
 describe('AsyncValidationCoordinator queries on empty', () => {
   test('hasPending returns false when no cycles started', () => {
-    const c = makeCoordinator();
+    const { c } = makeCoordinator();
     expect(c.hasPending()).toBe(false);
   });
 
   test('hasPendingFor returns false for any element when no cycles started', () => {
-    const c = makeCoordinator();
+    const { c } = makeCoordinator();
     const el = document.createElement('input');
     expect(c.hasPendingFor(el)).toBe(false);
   });
@@ -32,13 +33,7 @@ function deferred<T>() {
 
 describe('AsyncValidationCoordinator T1 new-slot path', () => {
   test('startCycle on empty slot increments pendingCount and fires transition callbacks', () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const d = deferred<FormValidatorValidationResult>();
     const controller = new AbortController();
@@ -54,13 +49,7 @@ describe('AsyncValidationCoordinator T1 new-slot path', () => {
   });
 
   test('two startCycles on same element different validators: element callback fires once, form once', () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     c.startCycle(el, 'x', deferred<FormValidatorValidationResult>().promise, new AbortController());
     c.startCycle(el, 'y', deferred<FormValidatorValidationResult>().promise, new AbortController());
@@ -70,13 +59,7 @@ describe('AsyncValidationCoordinator T1 new-slot path', () => {
   });
 
   test('two startCycles on different elements: element callback fires twice, form once', () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const elA = document.createElement('input');
     const elB = document.createElement('input');
     c.startCycle(elA, 'x', deferred<FormValidatorValidationResult>().promise, new AbortController());
@@ -95,13 +78,7 @@ async function flushMicrotasks() {
 
 describe('AsyncValidationCoordinator T2 resolve', () => {
   test('resolve applies result and fires not-pending transitions', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const d = deferred<FormValidatorValidationResult>();
     c.startCycle(el, 'x', d.promise, new AbortController());
@@ -138,13 +115,7 @@ describe('AsyncValidationCoordinator T2 resolve', () => {
   });
 
   test('resolving one of two slots on same element keeps element pending', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const dA = deferred<FormValidatorValidationResult>();
     const dB = deferred<FormValidatorValidationResult>();
@@ -162,13 +133,7 @@ describe('AsyncValidationCoordinator T2 resolve', () => {
 
 describe('AsyncValidationCoordinator T3 reject', () => {
   test('AbortError after replace drops silently, no double-decrement (counter invariant)', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const dOld = deferred<FormValidatorValidationResult>();
     const dNew = deferred<FormValidatorValidationResult>();
@@ -188,13 +153,7 @@ describe('AsyncValidationCoordinator T3 reject', () => {
   });
 
   test('non-AbortError with no onError manufactures default failure result', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const d = deferred<FormValidatorValidationResult>();
     c.startCycle(el, 'x', d.promise, new AbortController());
@@ -210,13 +169,7 @@ describe('AsyncValidationCoordinator T3 reject', () => {
   });
 
   test('non-AbortError with onError uses its returned result', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const d = deferred<FormValidatorValidationResult>();
     const customResult = new FormValidatorValidationResult({
@@ -233,13 +186,7 @@ describe('AsyncValidationCoordinator T3 reject', () => {
   });
 
   test('onError that throws falls back to default failure result', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const d = deferred<FormValidatorValidationResult>();
     c.startCycle(el, 'x', d.promise, new AbortController(), () => {
@@ -255,13 +202,7 @@ describe('AsyncValidationCoordinator T3 reject', () => {
   });
 
   test('onError returning non-Result falls back to default failure result', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const d = deferred<FormValidatorValidationResult>();
     c.startCycle(el, 'x', d.promise, new AbortController(), () => 'not a result' as unknown as FormValidatorValidationResult);
@@ -277,13 +218,7 @@ describe('AsyncValidationCoordinator T3 reject', () => {
 
 describe('AsyncValidationCoordinator T1 replace path', () => {
   test('startCycle on existing slot aborts previous, bumps generation, no counter change, no callbacks', () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const ctrl1 = new AbortController();
     const ctrl2 = new AbortController();
@@ -302,13 +237,7 @@ describe('AsyncValidationCoordinator T1 replace path', () => {
   });
 
   test('after replace, only the new generation resolve applies', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const dOld = deferred<FormValidatorValidationResult>();
     const dNew = deferred<FormValidatorValidationResult>();
@@ -330,13 +259,7 @@ describe('AsyncValidationCoordinator T1 replace path', () => {
 
 describe('AsyncValidationCoordinator stale generation drops', () => {
   test('resolve of stale generation drops without apply or counter change', async () => {
-    const callbacks = {
-      onApplyResult: vi.fn(),
-      onElementPendingChange: vi.fn(),
-      onFormPendingChange: vi.fn(),
-      onSlotResolved: vi.fn(),
-    };
-    const c = new AsyncValidationCoordinator(callbacks);
+    const { c, callbacks } = makeCoordinator();
     const el = document.createElement('input');
     const dOld = deferred<FormValidatorValidationResult>();
     const dNew = deferred<FormValidatorValidationResult>();
