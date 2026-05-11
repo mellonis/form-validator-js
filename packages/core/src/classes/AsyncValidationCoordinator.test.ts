@@ -1,5 +1,5 @@
 import AsyncValidationCoordinator from './AsyncValidationCoordinator';
-import FormValidatorValidationResult from './FormValidatorValidationResult';
+import type FormValidatorValidationResult from './FormValidatorValidationResult';
 
 function makeCoordinator() {
   return new AsyncValidationCoordinator({
