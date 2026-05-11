@@ -1981,3 +1981,161 @@ describe('FormValidator ignoreValidationResult + async', () => {
     expect(after).toHaveBeenCalled();
   });
 });
+
+describe('FormValidator async submit additional coverage', () => {
+  test('loop guard: post-resolution requestSubmit does NOT re-trigger validate', async () => {
+    document.body.innerHTML = '<form id="lg"><input name="u" data-validation="a"/></form>';
+    const form22 = document.getElementById('lg') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const validate = vi.fn(() => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }));
+    new FormValidator({
+      form: form22,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    form22.addEventListener('submit', (e) => e.preventDefault());
+
+    form22.requestSubmit();
+    expect(validate).toHaveBeenCalledTimes(1);
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    // Post-resolution requestSubmit re-enters #submitEventHandler with #allowNextSubmit set;
+    // it must early-return WITHOUT dispatching validate events.
+    expect(validate).toHaveBeenCalledTimes(1);
+  });
+
+  test('submitter preserved across requestSubmit', async () => {
+    document.body.innerHTML = `
+      <form id="sp">
+        <input name="u" data-validation="a"/>
+        <button type="submit" name="action" value="primary" id="primary">Primary</button>
+        <button type="submit" name="action" value="secondary" id="secondary">Secondary</button>
+      </form>`;
+    const form23 = document.getElementById('sp') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form23,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    let observedSubmitter: HTMLElement | null = 'sentinel' as unknown as HTMLElement;
+    form23.addEventListener('submit', (e) => {
+      observedSubmitter = (e as SubmitEvent).submitter;
+      e.preventDefault();
+    });
+
+    const secondary = document.getElementById('secondary') as HTMLButtonElement;
+    form23.requestSubmit(secondary);
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(observedSubmitter).toBe(secondary);
+  });
+
+  test('concurrent submit while pending: last submitter wins, single hand-off', async () => {
+    document.body.innerHTML = `
+      <form id="cs">
+        <input name="u" data-validation="a"/>
+        <button type="submit" name="b" value="first" id="firstBtn">First</button>
+        <button type="submit" name="b" value="second" id="secondBtn">Second</button>
+      </form>`;
+    const form24 = document.getElementById('cs') as HTMLFormElement;
+    let lastResolve!: (r: FormValidatorValidationResult) => void;
+    const validate = vi.fn(() => new Promise<FormValidatorValidationResult>((res) => { lastResolve = res; }));
+    new FormValidator({
+      form: form24,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    let observedSubmitter: HTMLElement | null = null;
+    let submitFireCount = 0;
+    form24.addEventListener('submit', (e) => {
+      submitFireCount += 1;
+      observedSubmitter = (e as SubmitEvent).submitter;
+      e.preventDefault();
+    });
+
+    const first = document.getElementById('firstBtn') as HTMLButtonElement;
+    const second = document.getElementById('secondBtn') as HTMLButtonElement;
+    form24.requestSubmit(first);
+    form24.requestSubmit(second);
+    // Both attempts blocked. lastResolve points to the second cycle's deferred.
+    lastResolve(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    // Exactly one hand-off resubmit (initial two attempts + 1 hand-off = 3 total submit events,
+    // but the initial two were blocked. The downstream listener fires once per UN-blocked submit.
+    // The first two submits were preventDefault'd by our engine before reaching the listener? No —
+    // `addEventListener` runs in registration order, after `new FormValidator(...)`, so they ARE
+    // blocked by stopImmediatePropagation. Only the post-resolution resubmit reaches the listener.
+    expect(submitFireCount).toBe(1);
+    expect(observedSubmitter).toBe(second);
+  });
+
+  test('reportValidityOnSubmit does NOT fire while async is pending', async () => {
+    document.body.innerHTML = '<form id="rv"><input name="u" data-validation="a"/></form>';
+    const form25 = document.getElementById('rv') as HTMLFormElement;
+    const reportValiditySpy = vi.spyOn(form25, 'reportValidity');
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form25,
+      reportValidityOnSubmit: true,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+
+    form25.requestSubmit();
+    expect(reportValiditySpy).not.toHaveBeenCalled(); // pending: no reportValidity yet
+
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(reportValiditySpy).toHaveBeenCalledTimes(1); // resolved invalid: now fires
+  });
+
+  test('manageValidity: false + async — setCustomValidity is NOT called', async () => {
+    document.body.innerHTML = '<form id="mv"><input name="u" data-validation="a"/></form>';
+    const form26 = document.getElementById('mv') as HTMLFormElement;
+    const input = form26.querySelector('input')!;
+    const setCustomValiditySpy = vi.spyOn(input, 'setCustomValidity');
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form26,
+      manageValidity: false,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(setCustomValiditySpy).not.toHaveBeenCalled();
+  });
+});
