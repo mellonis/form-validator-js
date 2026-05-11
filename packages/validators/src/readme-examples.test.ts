@@ -320,3 +320,154 @@ describe('README: ignoreValidationResult', () => {
     expect(calls).toEqual([['required']]);
   });
 });
+
+describe('README async-validation snippets', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+
+  test('defining an async validator (uniqueUsername example)', async () => {
+    document.body.innerHTML = '<form id="t"><input id="u" data-validation="uniqueUsername"/></form>';
+    const form = document.getElementById('t') as HTMLFormElement;
+    const input = document.getElementById('u') as HTMLInputElement;
+
+    const fakeFetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve({ taken: true }) });
+    (globalThis as { fetch: unknown }).fetch = fakeFetch;
+
+    const onChange = vi.fn();
+    new FormValidator({
+      form,
+      validatorDeclarations: {
+        uniqueUsername: {
+          init: (target) => new FormValidatorInitResult({ observableElementList: [target], extraData: {} }),
+          async validate(target, _data, opts) {
+            const value = (target as HTMLInputElement).value;
+            if (value.length < 3) return new FormValidatorValidationResult({ isValid: false });
+            const r = await fetch(`/api/username-available?u=${encodeURIComponent(value)}`, { signal: opts!.signal });
+            const taken = (await r.json()).taken;
+            return new FormValidatorValidationResult({ isValid: !taken });
+          },
+          errorMessage: { '': 'Username taken', error: 'Could not verify, try again' },
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+
+    input.value = 'foobar';
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toContain('Username taken');
+  });
+
+  test('debounce recipe: wait helper aborts on signal', async () => {
+    function wait(ms: number, signal: AbortSignal): Promise<void> {
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(resolve, ms);
+        signal.addEventListener('abort', () => {
+          clearTimeout(t);
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      });
+    }
+    const ctrl = new AbortController();
+    const p = wait(1000, ctrl.signal);
+    ctrl.abort();
+    await expect(p).rejects.toThrow();
+  });
+
+  test('pending callbacks fire as documented', async () => {
+    document.body.innerHTML = '<form id="t2"><input id="u2" data-validation="a"/></form>';
+    const form = document.getElementById('t2') as HTMLFormElement;
+    const input = document.getElementById('u2') as HTMLInputElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const onPending = vi.fn();
+    const onFormPending = vi.fn();
+    new FormValidator({
+      form,
+      validatorDeclarations: {
+        a: {
+          init: (target) => new FormValidatorInitResult({ observableElementList: [target], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+      onPendingChange: onPending,
+      onFormPendingChange: onFormPending,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(onPending).toHaveBeenCalledWith(input, true);
+    expect(onFormPending).toHaveBeenCalledWith(true);
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(onPending).toHaveBeenLastCalledWith(input, false);
+    expect(onFormPending).toHaveBeenLastCalledWith(false);
+  });
+
+  test('default failure subtype "error" lands in errors[]', async () => {
+    document.body.innerHTML = '<form id="t3"><input id="u3" data-validation="a"/></form>';
+    const form = document.getElementById('t3') as HTMLFormElement;
+    const input = document.getElementById('u3') as HTMLInputElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form,
+      validatorDeclarations: {
+        a: {
+          init: (target) => new FormValidatorInitResult({ observableElementList: [target], extraData: {} }),
+          validate: () => Promise.reject(new Error('network')),
+          errorMessage: { error: 'Could not verify, try again' },
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    await Promise.resolve(); await Promise.resolve();
+    const lastCall = onChange.mock.calls.at(-1)!;
+    const errors = lastCall[2];
+    expect(errors.some((e: { subtype: string }) => e.subtype === 'error')).toBe(true);
+  });
+
+  test('retry button pattern: validator.retry runs only the named validator', () => {
+    document.body.innerHTML = '<form id="t4"><input id="u4" data-validation="a"/></form>';
+    const form = document.getElementById('t4') as HTMLFormElement;
+    const input = document.getElementById('u4') as HTMLInputElement;
+    const validate = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const v = new FormValidator({
+      form,
+      validatorDeclarations: {
+        a: {
+          init: (target) => new FormValidatorInitResult({ observableElementList: [target], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    validate.mockClear();
+    v.retry(input, 'a');
+    expect(validate).toHaveBeenCalledTimes(1);
+  });
+
+  test('injection pattern still works (existing behavior preserved)', () => {
+    document.body.innerHTML = '<form id="t5"><input id="u5" data-validation="a"/></form>';
+    const form = document.getElementById('t5') as HTMLFormElement;
+    const input = document.getElementById('u5') as HTMLInputElement;
+    const validate = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const onChange = vi.fn();
+    new FormValidator({
+      form,
+      validatorDeclarations: {
+        a: {
+          init: (target) => new FormValidatorInitResult({ observableElementList: [target], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent({
+      data: { a: new FormValidatorValidationResult({ isValid: false }) },
+    }));
+    expect(validate).not.toHaveBeenCalled();
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toContain('invalid');
+  });
+});
