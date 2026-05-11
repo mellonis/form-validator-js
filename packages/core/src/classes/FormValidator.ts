@@ -647,6 +647,59 @@ export default class FormValidator {
     }
   };
 
+  #applyResults = (
+    targetElement: FormElement,
+    validationResultList: FormValidatorValidationResult[],
+  ): void => {
+    const elementSet = new Set<Element>();
+    const elementToErrorMessageBeforeValidationListMap = new Map<Element, string[]>();
+
+    for (const validationResult of validationResultList) {
+      const { isContextError, isValid, validatorName } = validationResult;
+      const element = isContextError
+        ? this.#getContext(targetElement, validatorName).element
+        : targetElement;
+
+      if (!elementToErrorMessageBeforeValidationListMap.has(element)) {
+        elementToErrorMessageBeforeValidationListMap.set(
+          element,
+          getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []),
+        );
+      }
+
+      if (isValid) {
+        this.#removeError(element, validationResult);
+      } else {
+        this.#addError(element, validationResult);
+      }
+
+      elementSet.add(element);
+    }
+
+    for (const element of elementSet) {
+      const before = elementToErrorMessageBeforeValidationListMap.get(element) ?? [];
+      const after = getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []);
+      const sameLength = before.length === after.length;
+      const sameContents = sameLength && before.every((msg, ix) => msg === after[ix]);
+      if (!sameContents) {
+        this.#syncAriaInvalid(element, after.length > 0);
+        this.#syncCustomValidity(element, after);
+        this.#onErrorMessageListChanged(element, after, []);
+      }
+    }
+
+    // For fields whose effective trigger is 'blur-then-input': mark the
+    // targetElement as having been shown an error if any validator on this
+    // cycle returned invalid (regardless of where the error landed — direct
+    // or context). The transition is one-way until form reset.
+    if (
+      this.#getEffectiveTrigger(targetElement) === 'blur-then-input'
+      && validationResultList.some((r) => !r.isValid)
+    ) {
+      this.#fieldsShownError.add(targetElement);
+    }
+  };
+
   #clearCustomValidity = (element: Element): void => {
     if (!this.#manageValidity) return;
     if (
@@ -785,53 +838,7 @@ export default class FormValidator {
       }
     }
 
-    const elementSet = new Set<Element>();
-    const elementToErrorMessageBeforeValidationListMap = new Map<Element, string[]>();
-
-    for (const validationResult of validationResultList) {
-      const { isContextError, isValid, validatorName } = validationResult;
-      const element = isContextError
-        ? this.#getContext(targetElement, validatorName).element
-        : targetElement;
-
-      if (!elementToErrorMessageBeforeValidationListMap.has(element)) {
-        elementToErrorMessageBeforeValidationListMap.set(
-          element,
-          getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []),
-        );
-      }
-
-      if (isValid) {
-        this.#removeError(element, validationResult);
-      } else {
-        this.#addError(element, validationResult);
-      }
-
-      elementSet.add(element);
-    }
-
-    for (const element of elementSet) {
-      const before = elementToErrorMessageBeforeValidationListMap.get(element) ?? [];
-      const after = getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []);
-      const sameLength = before.length === after.length;
-      const sameContents = sameLength && before.every((msg, ix) => msg === after[ix]);
-      if (!sameContents) {
-        this.#syncAriaInvalid(element, after.length > 0);
-        this.#syncCustomValidity(element, after);
-        this.#onErrorMessageListChanged(element, after, []);
-      }
-    }
-
-    // For fields whose effective trigger is 'blur-then-input': mark the
-    // targetElement as having been shown an error if any validator on this
-    // cycle returned invalid (regardless of where the error landed — direct
-    // or context). The transition is one-way until form reset.
-    if (
-      this.#getEffectiveTrigger(targetElement) === 'blur-then-input'
-      && validationResultList.some((r) => !r.isValid)
-    ) {
-      this.#fieldsShownError.add(targetElement);
-    }
+    this.#applyResults(targetElement, validationResultList);
 
     event.stopPropagation();
   };

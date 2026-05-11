@@ -1477,3 +1477,27 @@ describe('FormValidator type-widening surface', () => {
     })).not.toThrow();
   });
 });
+
+describe('FormValidator #applyResults refactor regression', () => {
+  test('sync validate still fires onErrorMessageListChanged with correct messages', () => {
+    document.body.innerHTML = '<form id="r"><input name="a" data-validation="r"/></form>';
+    const form3 = document.getElementById('r') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form3,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: false }),
+          errorMessage: 'invalid',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form3.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(onChange).toHaveBeenCalled();
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toContain('invalid');
+  });
+});
