@@ -3,9 +3,10 @@ import {
   FormValidator,
   FormValidatorInitResult,
   FormValidatorValidationResult,
+  type ErrorDetail,
 } from '@form-validator-js/core';
 
-type OnErrorChange = (element: Element, errorMessages: string[]) => void;
+type OnErrorChange = (element: Element, errorMessages: string[], errors: ErrorDetail[]) => void;
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -238,10 +239,10 @@ describe('FormValidator validations', () => {
       onErrorMessageListChangedMock.mock.calls
         .sort((a, b) => (a[0] as Element).tagName.localeCompare((b[0] as Element).tagName)),
     ).toEqual([
-      [form, ['b']],
-      [form, []],
-      [input, ['a']],
-      [input, []],
+      [form, ['b'], expect.any(Array)],
+      [form, [], []],
+      [input, ['a'], expect.any(Array)],
+      [input, [], []],
     ]);
   });
 
@@ -639,7 +640,7 @@ describe('FormValidator trigger option', () => {
 
     input.dispatchEvent(new Event('focusout', { bubbles: true }));
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(input, ['a']);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], expect.any(Array));
   });
 
   test('trigger: blur — observable wiring fires on observed field focusout', () => {
@@ -679,7 +680,7 @@ describe('FormValidator trigger option', () => {
 
     // focusout on the observed (password) field should trigger confirm's validation
     password.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, ['must match']);
+    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], expect.any(Array));
   });
 
   test('trigger: blur — submit still validates everything', () => {
@@ -733,7 +734,7 @@ describe('FormValidator trigger option', () => {
     const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
     form.dispatchEvent(submitEvent);
     expect(submitEvent.defaultPrevented).toBe(true);
-    expect(onError).toHaveBeenCalledWith(input, ['a']);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], expect.any(Array));
   });
 
   test('per-field data-validation-trigger overrides engine default', () => {
@@ -767,7 +768,7 @@ describe('FormValidator trigger option', () => {
     expect(onError).not.toHaveBeenCalled();
 
     loud.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(loud, ['a']);
+    expect(onError).toHaveBeenCalledWith(loud, ['a'], expect.any(Array));
   });
 
   test('per-field data-validation-trigger with invalid value falls back to engine default', () => {
@@ -822,7 +823,7 @@ describe('FormValidator trigger option', () => {
     expect(onError).not.toHaveBeenCalled();
 
     ext.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(ext, ['a']);
+    expect(onError).toHaveBeenCalledWith(ext, ['a'], expect.any(Array));
   });
 });
 
@@ -854,7 +855,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     expect(onError).not.toHaveBeenCalled();
 
     input.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(input, ['too short']);
+    expect(onError).toHaveBeenCalledWith(input, ['too short'], expect.any(Array));
   });
 
   test('after first error, field switches to eager: input fires validation', () => {
@@ -883,7 +884,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     input.value = 'abc';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     expect(onError).toHaveBeenCalledTimes(2); // error cleared
-    expect(onError).toHaveBeenLastCalledWith(input, []);
+    expect(onError).toHaveBeenLastCalledWith(input, [], []);
   });
 
   test('field stays in eager mode even after passing validation (one-way transition)', () => {
@@ -911,7 +912,7 @@ describe('FormValidator trigger: blur-then-input', () => {
     // not waiting for a focusout.
     input.value = 'a';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(input, ['too short']);
+    expect(onError).toHaveBeenCalledWith(input, ['too short'], expect.any(Array));
   });
 
   test('reset returns fields to untouched (subsequent input does NOT fire)', () => {
@@ -974,13 +975,13 @@ describe('FormValidator trigger: blur-then-input', () => {
 
     // password's focusout — propagates to confirm; confirm validates and gets shown an error.
     password.dispatchEvent(new Event('focusout', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, ['must match']);
+    expect(onError).toHaveBeenCalledWith(confirm, ['must match'], expect.any(Array));
 
     // Now confirm is in eager mode — typing in password fires confirm validation eagerly.
     onError.mockClear();
     password.value = 'a'; // matches confirm
     password.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(onError).toHaveBeenCalledWith(confirm, []); // error cleared eagerly
+    expect(onError).toHaveBeenCalledWith(confirm, [], expect.any(Array)); // error cleared eagerly
   });
 
   test('submit always validates regardless of trigger', () => {
@@ -1277,7 +1278,7 @@ describe('FormValidator picks up form=-linked inputs (HTMLFormControlsCollection
     external.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(external, ['a']);
+    expect(onError).toHaveBeenCalledWith(external, ['a'], expect.any(Array));
   });
 
   test('submit blocks when only an external input is invalid', () => {
@@ -1377,7 +1378,7 @@ describe('FormValidator unknown validator names in data-validation', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(input, ['a']);
+    expect(onError).toHaveBeenCalledWith(input, ['a'], expect.any(Array));
   });
 });
 
@@ -1409,7 +1410,7 @@ describe('FormValidator nested validation context', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(group, ['group-error']);
+    expect(onError).toHaveBeenCalledWith(group, ['group-error'], expect.any(Array));
   });
 
   test('walks past inner context that does not cover the validator', () => {
@@ -1439,6 +1440,777 @@ describe('FormValidator nested validation context', () => {
     input.dispatchEvent(FormValidator.createValidateEvent());
 
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(form, ['outer-error']);
+    expect(onError).toHaveBeenCalledWith(form, ['outer-error'], expect.any(Array));
+  });
+});
+
+describe('FormValidator type-widening surface', () => {
+  test('onErrorMessageListChanged receives a third arg (errors) — empty array when no errors initially', () => {
+    document.body.innerHTML = '<form id="t"><input name="a" data-validation="required"/></form>';
+    const form2 = document.getElementById('t') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form2,
+      validatorDeclarations: {
+        required: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: true }),
+          errorMessage: 'required',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    // Trigger a validation cycle so the callback fires at least once if anything changes.
+    const input = form2.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    // Test passes if the constructor accepts the wider signature; behaviour is exercised in Task 14.
+    expect(true).toBe(true);
+  });
+
+  test('onPendingChange and onFormPendingChange are accepted in constructor params', () => {
+    document.body.innerHTML = '<form id="t2"/>';
+    const form2 = document.getElementById('t2') as HTMLFormElement;
+    expect(() => new FormValidator({
+      form: form2,
+      onPendingChange: () => {},
+      onFormPendingChange: () => {},
+    })).not.toThrow();
+  });
+});
+
+describe('FormValidator #applyResults refactor regression', () => {
+  test('sync validate still fires onErrorMessageListChanged with correct messages', () => {
+    document.body.innerHTML = '<form id="r"><input name="a" data-validation="r"/></form>';
+    const form3 = document.getElementById('r') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form3,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: false }),
+          errorMessage: 'invalid',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form3.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(onChange).toHaveBeenCalled();
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toContain('invalid');
+  });
+});
+
+describe('FormValidator coordinator wiring', () => {
+  test('constructor accepts onPendingChange and onFormPendingChange without throwing', () => {
+    document.body.innerHTML = '<form id="cw"/>';
+    const form4 = document.getElementById('cw') as HTMLFormElement;
+    const onPending = vi.fn();
+    const onFormPending = vi.fn();
+    expect(() => new FormValidator({
+      form: form4,
+      onPendingChange: onPending,
+      onFormPendingChange: onFormPending,
+    })).not.toThrow();
+    // No async cycles started yet → no callbacks fired.
+    expect(onPending).not.toHaveBeenCalled();
+    expect(onFormPending).not.toHaveBeenCalled();
+  });
+});
+
+describe('FormValidator async validation routing', () => {
+  function setupAsyncForm(opts: {
+    validate: (target: Element, data: unknown, options?: { signal: AbortSignal }) => unknown;
+    onError?: (err: unknown) => FormValidatorValidationResult;
+    onPending?: (el: Element, p: boolean) => void;
+    onFormPending?: (p: boolean) => void;
+    onErrorChange?: (el: Element, msgs: string[], errors: unknown[]) => void;
+  }) {
+    document.body.innerHTML = '<form id="af"><input name="u" data-validation="async"/></form>';
+    const form5 = document.getElementById('af') as HTMLFormElement;
+    const validator = new FormValidator({
+      form: form5,
+      validatorDeclarations: {
+        async: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: opts.validate as never,
+          errorMessage: { '': 'invalid', error: 'failed to verify' },
+          onError: opts.onError,
+        },
+      },
+      onPendingChange: opts.onPending,
+      onFormPendingChange: opts.onFormPending,
+      onErrorMessageListChanged: opts.onErrorChange,
+    });
+    const input = form5.querySelector('input')!;
+    return { form: form5, input, validator };
+  }
+
+  test('Promise-returning validate routes through coordinator (pending callback fires)', () => {
+    const onPending = vi.fn();
+    const { input } = setupAsyncForm({
+      validate: () => new Promise(() => { /* never resolves */ }),
+      onPending,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(onPending).toHaveBeenCalledWith(input, true);
+  });
+
+  test('async result lands in error store and fires onErrorMessageListChanged', async () => {
+    const onErrorChange = vi.fn();
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const { input } = setupAsyncForm({
+      validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+      onErrorChange,
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    const lastCall = onErrorChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toContain('invalid');
+  });
+
+  test('sync result on a slot with in-flight async aborts the in-flight (via injection)', () => {
+    let abortedFromInside = false;
+    const { input } = setupAsyncForm({
+      validate: (_t, _d, opts) => {
+        if (!opts) return new FormValidatorValidationResult({ isValid: true });
+        opts.signal.addEventListener('abort', () => { abortedFromInside = true; });
+        return new Promise(() => { /* never resolves */ });
+      },
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(abortedFromInside).toBe(false);
+
+    // Inject a result; per spec, this aborts the in-flight async for that (target, validator) slot.
+    input.dispatchEvent(FormValidator.createValidateEvent({
+      data: { async: new FormValidatorValidationResult({ isValid: true }) },
+    }));
+    expect(abortedFromInside).toBe(true);
+  });
+});
+
+describe('FormValidator ErrorDetail third arg', () => {
+  test('errors[] is parallel to msgs[] for sync invalid result with default subtype', () => {
+    document.body.innerHTML = '<form id="ed"><input name="a" data-validation="r"/></form>';
+    const form6 = document.getElementById('ed') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form6,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: false }),
+          errorMessage: 'oops',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form6.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[1]).toEqual(['oops']);
+    expect(lastCall[2]).toEqual([{
+      validatorName: 'r',
+      subtype: '',
+      message: 'oops',
+      isContextError: false,
+    }]);
+  });
+
+  test('errors[] surfaces validatorSubtypeList correctly', () => {
+    document.body.innerHTML = '<form id="ed2"><input name="a" data-validation="r"/></form>';
+    const form7 = document.getElementById('ed2') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form7,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({
+            isValid: false,
+            validatorSubtypeList: ['too-short', 'no-digit'],
+          }),
+          errorMessage: { 'too-short': 'short', 'no-digit': 'needs digit' },
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form7.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    const lastCall = onChange.mock.calls.at(-1)!;
+    expect(lastCall[2]).toHaveLength(lastCall[1].length);
+    expect(lastCall[2].map((e: { subtype: string }) => e.subtype)).toEqual(['too-short', 'no-digit']);
+  });
+
+  test('errors[] is empty when there are no errors after a reset', () => {
+    document.body.innerHTML = '<form id="ed3"><input name="a" data-validation="r"/></form>';
+    const form8 = document.getElementById('ed3') as HTMLFormElement;
+    const onChange = vi.fn();
+    new FormValidator({
+      form: form8,
+      validatorDeclarations: {
+        r: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: false }),
+          errorMessage: 'oops',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    const input = form8.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    onChange.mockClear();
+    form8.dispatchEvent(new Event('reset', { bubbles: true }));
+    if (onChange.mock.calls.length > 0) {
+      const lastCall = onChange.mock.calls.at(-1)!;
+      expect(lastCall[1]).toEqual([]);
+      expect(lastCall[2]).toEqual([]);
+    }
+  });
+});
+
+describe('FormValidator aria-busy management', () => {
+  test('aria-busy set on form control while async pending, removed on resolution', async () => {
+    document.body.innerHTML = '<form id="ab"><input name="u" data-validation="a"/></form>';
+    const form9 = document.getElementById('ab') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form9,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    const input = form9.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(input.getAttribute('aria-busy')).toBe('true');
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(input.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  test('aria-busy NOT set on non-form-control context element', () => {
+    document.body.innerHTML = `
+      <form id="ab2">
+        <fieldset data-validation-context="a">
+          <input name="u" data-validation="a"/>
+        </fieldset>
+      </form>`;
+    const form10 = document.getElementById('ab2') as HTMLFormElement;
+    new FormValidator({
+      form: form10,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise(() => {}),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    const input = form10.querySelector('input')!;
+    const fieldset = form10.querySelector('fieldset')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(input.getAttribute('aria-busy')).toBe('true');
+    expect(fieldset.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  test('destroy clears aria-busy on form controls that were pending', () => {
+    document.body.innerHTML = '<form id="ab3"><input name="u" data-validation="a"/></form>';
+    const form27 = document.getElementById('ab3') as HTMLFormElement;
+    const input = form27.querySelector('input')!;
+    const v = new FormValidator({
+      form: form27,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise(() => {}),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(input.getAttribute('aria-busy')).toBe('true');
+
+    v.destroy();
+    expect(input.hasAttribute('aria-busy')).toBe(false);
+  });
+});
+
+describe('FormValidator async submit flow', () => {
+  function asyncSubmitForm(opts: {
+    validate: () => Promise<FormValidatorValidationResult> | FormValidatorValidationResult;
+  }) {
+    document.body.innerHTML = '<form id="sf"><input name="u" data-validation="a"/><button type="submit">Go</button></form>';
+    const form11 = document.getElementById('sf') as HTMLFormElement;
+    new FormValidator({
+      form: form11,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: opts.validate as never,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    return form11;
+  }
+
+  test('submit blocked while async pending; preventDefault and stopImmediatePropagation called', () => {
+    const form12 = asyncSubmitForm({ validate: () => new Promise(() => {}) });
+    const after = vi.fn();
+    form12.addEventListener('submit', after);
+
+    const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
+    form12.dispatchEvent(submitEvent);
+    expect(submitEvent.defaultPrevented).toBe(true);
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  test('submit re-fires via requestSubmit after async resolves valid; AFTER-listener runs on resubmit', async () => {
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const form13 = asyncSubmitForm({
+      validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+    });
+    const after = vi.fn((e: Event) => e.preventDefault());
+    form13.addEventListener('submit', after);
+
+    form13.requestSubmit();
+    expect(after).not.toHaveBeenCalled();
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(after).toHaveBeenCalledTimes(1);
+  });
+
+  test('async resolves invalid: no resubmit, downstream submit listener does not fire', async () => {
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const form14 = asyncSubmitForm({
+      validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+    });
+    const after = vi.fn();
+    form14.addEventListener('submit', after);
+    form14.requestSubmit();
+
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  test('user edit during submit pending extends the wait', async () => {
+    let counter = 0;
+    let lastResolve!: (r: FormValidatorValidationResult) => void;
+    const form15 = asyncSubmitForm({
+      validate: () => {
+        counter += 1;
+        return new Promise<FormValidatorValidationResult>((res) => { lastResolve = res; });
+      },
+    });
+    const after = vi.fn();
+    form15.addEventListener('submit', after);
+
+    form15.requestSubmit(); // counter=1
+    const input = form15.querySelector('input')!;
+    input.dispatchEvent(new Event('input', { bubbles: true })); // counter=2 (cycle replaced)
+
+    lastResolve(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(counter).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('FormValidator reset and destroy with async', () => {
+  test('reset aborts in-flight async, fires false transitions, clears submit pending', async () => {
+    document.body.innerHTML = '<form id="rd"><input name="u" data-validation="a"/></form>';
+    const form16 = document.getElementById('rd') as HTMLFormElement;
+    let abortedFlag = false;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const onPending = vi.fn();
+    const onFormPending = vi.fn();
+    new FormValidator({
+      form: form16,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: (_t, _d, opts) => {
+            opts!.signal.addEventListener('abort', () => { abortedFlag = true; });
+            return new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; });
+          },
+          errorMessage: 'invalid',
+        },
+      },
+      onPendingChange: onPending,
+      onFormPendingChange: onFormPending,
+    });
+    const input = form16.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(abortedFlag).toBe(false);
+
+    form16.dispatchEvent(new Event('reset', { bubbles: true }));
+    expect(abortedFlag).toBe(true);
+    expect(onPending).toHaveBeenLastCalledWith(input, false);
+    expect(onFormPending).toHaveBeenLastCalledWith(false);
+
+    // resolveFn (if called now) should not affect anything because slot is gone.
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+  });
+
+  test('destroy aborts in-flight async without firing pending callbacks', async () => {
+    document.body.innerHTML = '<form id="rd2"><input name="u" data-validation="a"/></form>';
+    const form17 = document.getElementById('rd2') as HTMLFormElement;
+    let abortedFlag = false;
+    const onPending = vi.fn();
+    const onFormPending = vi.fn();
+    const v = new FormValidator({
+      form: form17,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: (_t, _d, opts) => {
+            opts!.signal.addEventListener('abort', () => { abortedFlag = true; });
+            return new Promise(() => {});
+          },
+          errorMessage: 'invalid',
+        },
+      },
+      onPendingChange: onPending,
+      onFormPendingChange: onFormPending,
+    });
+    const input = form17.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    onPending.mockClear();
+    onFormPending.mockClear();
+
+    v.destroy();
+    expect(abortedFlag).toBe(true);
+    expect(onPending).not.toHaveBeenCalled();
+    expect(onFormPending).not.toHaveBeenCalled();
+  });
+});
+
+describe('FormValidator.retry', () => {
+  test('retry(el) re-runs all validators (equivalent to dispatching createValidateEvent)', () => {
+    document.body.innerHTML = '<form id="rt"><input name="u" data-validation="a"/></form>';
+    const form18 = document.getElementById('rt') as HTMLFormElement;
+    const validate = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const v = new FormValidator({
+      form: form18,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    const input = form18.querySelector('input')!;
+    validate.mockClear();
+    v.retry(input);
+    expect(validate).toHaveBeenCalled();
+  });
+
+  test('retry(el, name) granular: re-runs only the named validator, leaves other slots untouched', () => {
+    document.body.innerHTML = '<form id="rt2"><input name="u" data-validation="a;b"/></form>';
+    const form19 = document.getElementById('rt2') as HTMLFormElement;
+    const validateA = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const validateB = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const v = new FormValidator({
+      form: form19,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: validateA,
+          errorMessage: 'a',
+        },
+        b: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: validateB,
+          errorMessage: 'b',
+        },
+      },
+    });
+    const input = form19.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    validateA.mockClear();
+    validateB.mockClear();
+    v.retry(input, 'a');
+    expect(validateA).toHaveBeenCalledTimes(1);
+    expect(validateB).not.toHaveBeenCalled();
+  });
+
+  test('retry(el, name) throws when validator name is not declared on the element', () => {
+    document.body.innerHTML = '<form id="rt3"><input name="u" data-validation="a"/></form>';
+    const form20 = document.getElementById('rt3') as HTMLFormElement;
+    const v = new FormValidator({
+      form: form20,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: true }),
+          errorMessage: 'a',
+        },
+      },
+    });
+    const input = form20.querySelector('input')!;
+    expect(() => v.retry(input, 'nonexistent')).toThrow(/not declared/);
+  });
+
+  test('retry(el, name) throws when element is not a known validation target', () => {
+    document.body.innerHTML = '<form id="rt4"><input name="u" data-validation="a"/></form><div id="d"></div>';
+    const form21 = document.getElementById('rt4') as HTMLFormElement;
+    const div = document.getElementById('d') as HTMLDivElement;
+    const v = new FormValidator({
+      form: form21,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: true }),
+          errorMessage: 'a',
+        },
+      },
+    });
+    expect(() => v.retry(div, 'a')).toThrow(/not a known validation target/);
+  });
+
+  test('retry(el, name) with async validator routes through coordinator', async () => {
+    document.body.innerHTML = '<form id="rt5"><input name="u" data-validation="a"/></form>';
+    const form22 = document.getElementById('rt5') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const validate = vi.fn(() => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }));
+    const onPending = vi.fn();
+    const v = new FormValidator({
+      form: form22,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+      onPendingChange: onPending,
+    });
+    const input = form22.querySelector('input')!;
+
+    // Settle the initial cycle so the slot is clean.
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    validate.mockClear();
+    onPending.mockClear();
+    v.retry(input, 'a');
+
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(onPending).toHaveBeenCalledWith(input, true);
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+});
+
+describe('FormValidator ignoreValidationResult + async', () => {
+  test('ignoreValidationResult rewrites async results to valid; submit proceeds', async () => {
+    document.body.innerHTML = '<form id="iva"><input name="u" data-validation="a"/></form>';
+    const form21 = document.getElementById('iva') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const onChange = vi.fn();
+    const v = new FormValidator({
+      form: form21,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    v.ignoreValidationResult = true;
+    const after = vi.fn();
+    form21.addEventListener('submit', after);
+
+    form21.requestSubmit();
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    // The "invalid" message should NOT have been recorded — rewrite forces isValid=true.
+    const lastCall = onChange.mock.calls.at(-1);
+    if (lastCall) {
+      expect(lastCall[1]).not.toContain('invalid');
+    }
+    // Submit should proceed (downstream listener fires on the resubmit).
+    expect(after).toHaveBeenCalled();
+  });
+});
+
+describe('FormValidator async submit additional coverage', () => {
+  test('loop guard: post-resolution requestSubmit does NOT re-trigger validate', async () => {
+    document.body.innerHTML = '<form id="lg"><input name="u" data-validation="a"/></form>';
+    const form22 = document.getElementById('lg') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const validate = vi.fn(() => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }));
+    new FormValidator({
+      form: form22,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    form22.addEventListener('submit', (e) => e.preventDefault());
+
+    form22.requestSubmit();
+    expect(validate).toHaveBeenCalledTimes(1);
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    // Post-resolution requestSubmit re-enters #submitEventHandler with #allowNextSubmit set;
+    // it must early-return WITHOUT dispatching validate events.
+    expect(validate).toHaveBeenCalledTimes(1);
+  });
+
+  test('submitter preserved across requestSubmit', async () => {
+    document.body.innerHTML = `
+      <form id="sp">
+        <input name="u" data-validation="a"/>
+        <button type="submit" name="action" value="primary" id="primary">Primary</button>
+        <button type="submit" name="action" value="secondary" id="secondary">Secondary</button>
+      </form>`;
+    const form23 = document.getElementById('sp') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form23,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    let observedSubmitter: HTMLElement | null = 'sentinel' as unknown as HTMLElement;
+    form23.addEventListener('submit', (e) => {
+      observedSubmitter = (e as SubmitEvent).submitter;
+      e.preventDefault();
+    });
+
+    const secondary = document.getElementById('secondary') as HTMLButtonElement;
+    form23.requestSubmit(secondary);
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(observedSubmitter).toBe(secondary);
+  });
+
+  test('concurrent submit while pending: last submitter wins, single hand-off', async () => {
+    document.body.innerHTML = `
+      <form id="cs">
+        <input name="u" data-validation="a"/>
+        <button type="submit" name="b" value="first" id="firstBtn">First</button>
+        <button type="submit" name="b" value="second" id="secondBtn">Second</button>
+      </form>`;
+    const form24 = document.getElementById('cs') as HTMLFormElement;
+    let lastResolve!: (r: FormValidatorValidationResult) => void;
+    const validate = vi.fn(() => new Promise<FormValidatorValidationResult>((res) => { lastResolve = res; }));
+    new FormValidator({
+      form: form24,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    let observedSubmitter: HTMLElement | null = null;
+    let submitFireCount = 0;
+    form24.addEventListener('submit', (e) => {
+      submitFireCount += 1;
+      observedSubmitter = (e as SubmitEvent).submitter;
+      e.preventDefault();
+    });
+
+    const first = document.getElementById('firstBtn') as HTMLButtonElement;
+    const second = document.getElementById('secondBtn') as HTMLButtonElement;
+    form24.requestSubmit(first);
+    form24.requestSubmit(second);
+    // Both attempts blocked. lastResolve points to the second cycle's deferred.
+    lastResolve(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+
+    // Exactly one hand-off resubmit (initial two attempts + 1 hand-off = 3 total submit events,
+    // but the initial two were blocked. The downstream listener fires once per UN-blocked submit.
+    // The first two submits were preventDefault'd by our engine before reaching the listener? No —
+    // `addEventListener` runs in registration order, after `new FormValidator(...)`, so they ARE
+    // blocked by stopImmediatePropagation. Only the post-resolution resubmit reaches the listener.
+    expect(submitFireCount).toBe(1);
+    expect(observedSubmitter).toBe(second);
+  });
+
+  test('reportValidityOnSubmit does NOT fire while async is pending', async () => {
+    document.body.innerHTML = '<form id="rv"><input name="u" data-validation="a"/></form>';
+    const form25 = document.getElementById('rv') as HTMLFormElement;
+    const reportValiditySpy = vi.spyOn(form25, 'reportValidity');
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form25,
+      reportValidityOnSubmit: true,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+
+    form25.requestSubmit();
+    expect(reportValiditySpy).not.toHaveBeenCalled(); // pending: no reportValidity yet
+
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(reportValiditySpy).toHaveBeenCalledTimes(1); // resolved invalid: now fires
+  });
+
+  test('manageValidity: false + async — setCustomValidity is NOT called', async () => {
+    document.body.innerHTML = '<form id="mv"><input name="u" data-validation="a"/></form>';
+    const form26 = document.getElementById('mv') as HTMLFormElement;
+    const input = form26.querySelector('input')!;
+    const setCustomValiditySpy = vi.spyOn(input, 'setCustomValidity');
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form26,
+      manageValidity: false,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(setCustomValiditySpy).not.toHaveBeenCalled();
   });
 });

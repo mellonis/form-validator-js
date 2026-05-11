@@ -1,6 +1,7 @@
 export { default as FormValidator } from './classes/FormValidator';
 export type {
   ElementType,
+  ErrorDetail,
   ErrorMessage,
   FormValidatorParams,
   ValidatorDeclaration,

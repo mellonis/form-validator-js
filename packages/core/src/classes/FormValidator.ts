@@ -1,5 +1,6 @@
 import FormValidatorInitResult, { type FormElement } from './FormValidatorInitResult';
 import FormValidatorValidationResult from './FormValidatorValidationResult';
+import AsyncValidationCoordinator from './AsyncValidationCoordinator';
 
 // Namespaced custom event type — chosen to avoid collisions with consumer or
 // third-party listeners that might also use a generic name like 'validate'.
@@ -29,6 +30,13 @@ export type ElementType =
 
 export type ErrorMessage = string | Record<string, string>;
 
+export interface ErrorDetail {
+  validatorName: string;
+  subtype: string;
+  message: string;
+  isContextError: boolean;
+}
+
 export type ValidatorInitFunction = (
   target: FormElement,
   params: { argumentString: string },
@@ -37,12 +45,14 @@ export type ValidatorInitFunction = (
 export type ValidatorValidateFunction = (
   target: FormElement,
   data: Record<string, unknown>,
-) => FormValidatorValidationResult | undefined;
+  options?: { signal: AbortSignal },
+) => FormValidatorValidationResult | Promise<FormValidatorValidationResult> | undefined;
 
 export interface ValidatorDeclaration {
   init?: ValidatorInitFunction;
   validate?: ValidatorValidateFunction;
   errorMessage?: ErrorMessage;
+  onError?: (err: unknown) => FormValidatorValidationResult;
 }
 
 export type ValidatorDeclarations = Record<string, ValidatorDeclaration>;
@@ -53,6 +63,7 @@ export interface FormValidatorParams {
   onErrorMessageListChanged?: (
     element: Element,
     errorMessages: string[],
+    errors: ErrorDetail[],
   ) => void;
   /**
    * Whether the engine should call `target.setCustomValidity(...)` on form
@@ -91,6 +102,17 @@ export interface FormValidatorParams {
    * Submit-time validation always runs regardless.
    */
   trigger?: TriggerMode;
+  /**
+   * Fires when an element's pending state flips between "no async in flight"
+   * and "at least one async in flight" (aggregated across all validators on
+   * that element). Used for per-field "checking…" UI.
+   */
+  onPendingChange?: (element: Element, isPending: boolean) => void;
+  /**
+   * Fires when the form-level pending state flips. Used for disabling the
+   * submit button while any async check is in flight.
+   */
+  onFormPendingChange?: (isPending: boolean) => void;
 }
 
 export type TriggerMode = 'input' | 'blur' | 'blur-then-input' | 'submit-only';
@@ -99,6 +121,7 @@ interface ValidatorDefinition {
   init: ValidatorInitFunction;
   validate: ValidatorValidateFunction;
   errorMessage: Record<string, string>;
+  onError?: (err: unknown) => FormValidatorValidationResult;
 }
 
 interface ValidationContext {
@@ -112,6 +135,7 @@ interface ValidationError {
   validatorName: string;
   subtype: string;
   message: string | null;
+  isContextError: boolean;
 }
 
 interface TargetStorage {
@@ -171,8 +195,30 @@ function getErrorMessageList(errorList: ValidationError[]): string[] {
     .filter((message): message is string => message != null && message.length > 0);
 }
 
+function buildErrorDetailList(errorList: ValidationError[]): ErrorDetail[] {
+  const out: ErrorDetail[] = [];
+  for (const { validatorName, subtype, message, isContextError } of errorList) {
+    if (message == null || message.length === 0) continue;
+    out.push({ validatorName, subtype, message, isContextError });
+  }
+  return out;
+}
+
 export default class FormValidator {
   ignoreValidationResult = false;
+
+  #stampAndMaybeIgnore = (
+    r: FormValidatorValidationResult,
+    name: string,
+  ): FormValidatorValidationResult => {
+    r.validatorName = name;
+    if (!this.ignoreValidationResult) return r;
+    return new FormValidatorValidationResult({
+      ...r,
+      validatorSubtypeList: r.validatorSubtypeList,
+      isValid: true,
+    });
+  };
 
   #elementToErrorListMap = new Map<Element, ValidationError[]>();
 
@@ -189,6 +235,7 @@ export default class FormValidator {
   readonly #onErrorMessageListChanged: (
     element: Element,
     errorMessages: string[],
+    errors: ErrorDetail[],
   ) => void;
 
   readonly #manageValidity: boolean;
@@ -211,6 +258,18 @@ export default class FormValidator {
 
   readonly #validatorNameToDefinitionMap = new Map<string, ValidatorDefinition>();
 
+  readonly #onPendingChange: (element: Element, isPending: boolean) => void;
+
+  readonly #onFormPendingChange: (isPending: boolean) => void;
+
+  readonly #coordinator: AsyncValidationCoordinator;
+
+  #submitPending = false;
+
+  #submitSubmitter: HTMLElement | null = null;
+
+  #allowNextSubmit = false;
+
   constructor({
     form,
     validatorDeclarations = {},
@@ -218,6 +277,8 @@ export default class FormValidator {
     manageValidity = true,
     reportValidityOnSubmit = false,
     trigger = 'blur-then-input',
+    onPendingChange = () => {},
+    onFormPendingChange = () => {},
   }: FormValidatorParams) {
     if (!(form instanceof HTMLFormElement)) {
       throw new Error('form must be an HTMLFormElement');
@@ -228,6 +289,23 @@ export default class FormValidator {
     this.#manageValidity = manageValidity;
     this.#reportValidityOnSubmit = reportValidityOnSubmit;
     this.#trigger = trigger;
+    this.#onPendingChange = onPendingChange;
+    this.#onFormPendingChange = onFormPendingChange;
+    this.#coordinator = new AsyncValidationCoordinator({
+      onApplyResult: (element, name, result) => {
+        this.#applyResults(element as FormElement, [this.#stampAndMaybeIgnore(result, name)]);
+      },
+      onElementPendingChange: (element, isPending) => {
+        this.#syncAriaBusy(element, isPending);
+        this.#onPendingChange(element, isPending);
+      },
+      onFormPendingChange: (isPending) => {
+        this.#onFormPendingChange(isPending);
+      },
+      onSlotResolved: () => {
+        this.#checkSubmitHandoff();
+      },
+    });
     this.#form.setAttribute('novalidate', '');
     this.#form.setAttribute('data-validation-context', '*');
     this.#specificErrorMessagesFacade = new ElementErrorMessageFacade(
@@ -274,6 +352,59 @@ export default class FormValidator {
     this.#targetElementToStorageMap.clear();
     this.#validatorNameToDefinitionMap.clear();
     this.#specificErrorMessages.clear();
+    // Clear aria-busy on any elements that were pending before aborting,
+    // so callers aren't left with stale "in progress" accessibility state.
+    for (const element of this.#coordinator.pendingElements()) {
+      this.#syncAriaBusy(element, false);
+    }
+    // Abort any in-flight async validators silently so their callbacks don't
+    // fire after the instance is torn down. Using abortAllSilent (not abortAll)
+    // because teardown shouldn't surface pending-state transitions.
+    this.#coordinator.abortAllSilent();
+    this.#submitPending = false;
+    this.#submitSubmitter = null;
+    this.#allowNextSubmit = false;
+  }
+
+  retry(element: Element, validatorName?: string): void {
+    if (validatorName === undefined) {
+      element.dispatchEvent(FormValidator.createValidateEvent());
+      return;
+    }
+
+    if (!(element instanceof HTMLInputElement
+      || element instanceof HTMLSelectElement
+      || element instanceof HTMLTextAreaElement)) {
+      throw new Error('Element is not a known validation target');
+    }
+
+    const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(element);
+
+    if (!validatorNameToContextMap.has(validatorName)) {
+      throw new Error(`Validator "${validatorName}" is not declared on the given element`);
+    }
+
+    const definition = this.#validatorNameToDefinitionMap.get(validatorName);
+    if (!definition) {
+      throw new Error(`Validator "${validatorName}" has no registered definition`);
+    }
+
+    const data = validatorNameToDataMap.get(validatorName);
+    if (!data) return;
+
+    this.#coordinator.abortSlot(element, validatorName);
+
+    const controller = new AbortController();
+    const returnValue = definition.validate(element, data, { signal: controller.signal });
+
+    if (returnValue instanceof Promise) {
+      this.#coordinator.startCycle(element, validatorName, returnValue, controller, definition.onError);
+      return;
+    }
+
+    if (returnValue instanceof FormValidatorValidationResult) {
+      this.#applyResults(element, [this.#stampAndMaybeIgnore(returnValue, validatorName)]);
+    }
   }
 
   static getElementType(element: Element): ElementType | null {
@@ -341,6 +472,7 @@ export default class FormValidator {
         init,
         validate,
         errorMessage: normalizeErrorMessage(declaration.errorMessage),
+        onError: declaration.onError,
       });
     }
 
@@ -454,6 +586,7 @@ export default class FormValidator {
         validatorName,
         subtype,
         message: messages[subtype] ?? null,
+        isContextError: validationResult.isContextError,
       });
     }
   };
@@ -551,7 +684,10 @@ export default class FormValidator {
       // input event:
       if (effective === 'input') return true;
       if (effective === 'blur-then-input') {
-        return this.#fieldsShownError.has(field as FormElement);
+        // While a submit is pending (async validation in flight from a submit
+        // attempt), any user edit should immediately re-trigger validation so
+        // the pending result reflects the latest value.
+        return this.#submitPending || this.#fieldsShownError.has(field as FormElement);
       }
       return false; // 'blur' mode: only focusout fires
     };
@@ -623,6 +759,63 @@ export default class FormValidator {
     }
   };
 
+  #applyResults = (
+    targetElement: FormElement,
+    validationResultList: FormValidatorValidationResult[],
+  ): void => {
+    const elementSet = new Set<Element>();
+    const elementToErrorMessageBeforeValidationListMap = new Map<Element, string[]>();
+
+    for (const validationResult of validationResultList) {
+      const { isContextError, isValid, validatorName } = validationResult;
+      const element = isContextError
+        ? this.#getContext(targetElement, validatorName).element
+        : targetElement;
+
+      if (!elementToErrorMessageBeforeValidationListMap.has(element)) {
+        elementToErrorMessageBeforeValidationListMap.set(
+          element,
+          getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []),
+        );
+      }
+
+      if (isValid) {
+        this.#removeError(element, validationResult);
+      } else {
+        this.#addError(element, validationResult);
+      }
+
+      elementSet.add(element);
+    }
+
+    for (const element of elementSet) {
+      const before = elementToErrorMessageBeforeValidationListMap.get(element) ?? [];
+      const after = getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []);
+      const sameLength = before.length === after.length;
+      const sameContents = sameLength && before.every((msg, ix) => msg === after[ix]);
+      if (!sameContents) {
+        this.#syncAriaInvalid(element, after.length > 0);
+        this.#syncCustomValidity(element, after);
+        this.#onErrorMessageListChanged(
+          element,
+          after,
+          buildErrorDetailList(this.#elementToErrorListMap.get(element) ?? []),
+        );
+      }
+    }
+
+    // For fields whose effective trigger is 'blur-then-input': mark the
+    // targetElement as having been shown an error if any validator on this
+    // cycle returned invalid (regardless of where the error landed — direct
+    // or context). The transition is one-way until form reset.
+    if (
+      this.#getEffectiveTrigger(targetElement) === 'blur-then-input'
+      && validationResultList.some((r) => !r.isValid)
+    ) {
+      this.#fieldsShownError.add(targetElement);
+    }
+  };
+
   #clearCustomValidity = (element: Element): void => {
     if (!this.#manageValidity) return;
     if (
@@ -676,11 +869,15 @@ export default class FormValidator {
 
   #resetEventHandler = (event: Event): void => {
     if (event.target === this.#form) {
+      this.#coordinator.abortAll();
+      this.#submitPending = false;
+      this.#submitSubmitter = null;
+      this.#allowNextSubmit = false;
       for (const element of this.#elementToErrorListMap.keys()) {
         this.#elementToErrorListMap.set(element, []);
         this.#clearAriaInvalid(element);
         this.#clearCustomValidity(element);
-        this.#onErrorMessageListChanged(element, []);
+        this.#onErrorMessageListChanged(element, [], []);
       }
       // Returns all fields to "untouched" — subsequent input won't fire
       // validation in 'blur-then-input' mode until each field is shown an error again.
@@ -691,20 +888,72 @@ export default class FormValidator {
   #submitEventHandler = (event: Event): void => {
     if (event.target !== this.#form) return;
 
+    if (this.#allowNextSubmit) {
+      this.#allowNextSubmit = false;
+      return; // post-resolution requestSubmit re-entry — let through.
+    }
+
+    const submitter = (event as SubmitEvent).submitter ?? null;
+
     this.#getValidationTargets().forEach((element) => {
       element.dispatchEvent(FormValidator.createValidateEvent());
     });
 
-    if (this.#hasErrors()) {
-      event.stopImmediatePropagation();
-      event.preventDefault();
+    const hasErrorsNow = this.#hasErrors();
+    const hasPending = this.#coordinator.hasPending();
+
+    if (!hasErrorsNow && !hasPending) {
+      return; // existing path: all sync valid, let event proceed.
+    }
+
+    event.stopImmediatePropagation();
+    event.preventDefault();
+
+    if (hasPending) {
+      this.#submitPending = true;
+      this.#submitSubmitter = submitter;
+      // resolution will happen via #checkSubmitHandoff once pendingCount hits 0.
+    } else {
+      // Surface the browser's native tooltip on the first invalid field.
+      // With `manageValidity: true` (default), the message comes from our
+      // setCustomValidity calls; otherwise from any native HTML validity.
       if (this.#reportValidityOnSubmit) {
-        // Surface the browser's native tooltip on the first invalid field.
-        // With `manageValidity: true` (default), the message comes from our
-        // setCustomValidity calls; otherwise from any native HTML validity.
         this.#form.reportValidity();
       }
     }
+  };
+
+  #syncAriaBusy = (element: Element, isPending: boolean): void => {
+    if (!(element instanceof HTMLInputElement
+      || element instanceof HTMLSelectElement
+      || element instanceof HTMLTextAreaElement)) {
+      return; // skip non-form-controls (mirrors aria-invalid scope)
+    }
+    if (isPending) {
+      element.setAttribute('aria-busy', 'true');
+    } else {
+      element.removeAttribute('aria-busy');
+    }
+  };
+
+  #checkSubmitHandoff = (): void => {
+    if (!this.#submitPending) return;
+    if (this.#coordinator.hasPending()) return;
+    this.#resolveSubmitPending();
+  };
+
+  #resolveSubmitPending = (): void => {
+    this.#submitPending = false;
+    const submitter = this.#submitSubmitter;
+    this.#submitSubmitter = null;
+
+    if (this.#hasErrors()) {
+      if (this.#reportValidityOnSubmit) this.#form.reportValidity();
+      return;
+    }
+
+    this.#allowNextSubmit = true;
+    this.#form.requestSubmit(submitter ?? undefined);
   };
 
   #validateEventHandler = (event: CustomEvent): void => {
@@ -732,82 +981,47 @@ export default class FormValidator {
     const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(targetElement);
 
     const validationResultList: FormValidatorValidationResult[] = [];
+
     for (const validatorName of validatorNameToContextMap.keys()) {
       const data = validatorNameToDataMap.get(validatorName);
       if (!data) continue;
 
-      let validationResult: FormValidatorValidationResult | undefined;
-
       const injected = eventData[validatorName];
       if (injected instanceof FormValidatorValidationResult) {
-        validationResult = injected;
-      } else {
-        const definition = this.#validatorNameToDefinitionMap.get(validatorName);
-        validationResult = definition?.validate(targetElement, data);
+        // Injection path — abort any in-flight async for this slot first.
+        this.#coordinator.abortSlot(targetElement, validatorName);
+        validationResultList.push(this.#stampAndMaybeIgnore(injected, validatorName));
+        continue;
       }
 
-      if (!(validationResult instanceof FormValidatorValidationResult)) continue;
+      const definition = this.#validatorNameToDefinitionMap.get(validatorName);
+      if (!definition) continue;
 
-      validationResult.validatorName = validatorName;
+      const controller = new AbortController();
+      const returnValue = definition.validate(
+        targetElement,
+        data,
+        { signal: controller.signal },
+      );
 
-      if (this.ignoreValidationResult) {
-        validationResultList.push(new FormValidatorValidationResult({
-          ...validationResult,
-          validatorSubtypeList: validationResult.validatorSubtypeList,
-          isValid: true,
-        }));
-      } else {
-        validationResultList.push(validationResult);
-      }
-    }
-
-    const elementSet = new Set<Element>();
-    const elementToErrorMessageBeforeValidationListMap = new Map<Element, string[]>();
-
-    for (const validationResult of validationResultList) {
-      const { isContextError, isValid, validatorName } = validationResult;
-      const element = isContextError
-        ? this.#getContext(targetElement, validatorName).element
-        : targetElement;
-
-      if (!elementToErrorMessageBeforeValidationListMap.has(element)) {
-        elementToErrorMessageBeforeValidationListMap.set(
-          element,
-          getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []),
+      if (returnValue instanceof Promise) {
+        this.#coordinator.startCycle(
+          targetElement,
+          validatorName,
+          returnValue,
+          controller,
+          definition.onError,
         );
+        // async result will land via coordinator's onApplyResult → #applyResults
+      } else if (returnValue instanceof FormValidatorValidationResult) {
+        // Sync result supersedes any in-flight async for this slot.
+        this.#coordinator.abortSlot(targetElement, validatorName);
+        validationResultList.push(this.#stampAndMaybeIgnore(returnValue, validatorName));
       }
-
-      if (isValid) {
-        this.#removeError(element, validationResult);
-      } else {
-        this.#addError(element, validationResult);
-      }
-
-      elementSet.add(element);
+      // else (undefined / non-Result): silent skip, existing behavior.
     }
 
-    for (const element of elementSet) {
-      const before = elementToErrorMessageBeforeValidationListMap.get(element) ?? [];
-      const after = getErrorMessageList(this.#elementToErrorListMap.get(element) ?? []);
-      const sameLength = before.length === after.length;
-      const sameContents = sameLength && before.every((msg, ix) => msg === after[ix]);
-      if (!sameContents) {
-        this.#syncAriaInvalid(element, after.length > 0);
-        this.#syncCustomValidity(element, after);
-        this.#onErrorMessageListChanged(element, after);
-      }
-    }
-
-    // For fields whose effective trigger is 'blur-then-input': mark the
-    // targetElement as having been shown an error if any validator on this
-    // cycle returned invalid (regardless of where the error landed — direct
-    // or context). The transition is one-way until form reset.
-    if (
-      this.#getEffectiveTrigger(targetElement) === 'blur-then-input'
-      && validationResultList.some((r) => !r.isValid)
-    ) {
-      this.#fieldsShownError.add(targetElement);
-    }
+    this.#applyResults(targetElement, validationResultList);
 
     event.stopPropagation();
   };

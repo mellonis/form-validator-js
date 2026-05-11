@@ -1,9 +1,10 @@
 /// <reference types="node" />
 // Keeps the built-in validator list in sync across code and docs.
-// CLAUDE.md "Three places list the built-in validators": root README table,
-// packages/validators/README.md package summary, and the validators bullet
-// in root CLAUDE.md (## Architecture). Plus the index.ts exports and the
-// on-disk filenames. CI failures here mean one of them drifted.
+// CLAUDE.md "Two places list the built-in validators": packages/validators/README.md
+// (table + tagline summary line) and the validators bullet in root CLAUDE.md
+// (## Architecture). Plus the index.ts exports and the on-disk filenames.
+// The root README's "N built-in validators" prose count is also pinned.
+// CI failures here mean one of them drifted.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -29,10 +30,10 @@ describe('built-in validator list stays in sync', () => {
     expect(fileNames).toEqual(canonical);
   });
 
-  test('root README validator table lists exactly the canonical set', () => {
-    const readme = readFileSync(resolve(repoRoot, 'README.md'), 'utf8');
+  test('packages/validators/README.md validator table lists exactly the canonical set', () => {
+    const readme = readFileSync(resolve(here, '..', 'README.md'), 'utf8');
     const headerIdx = readme.indexOf('| Name | DSL | Argument | Notes |');
-    expect(headerIdx, 'validator table header not found in README.md').toBeGreaterThan(-1);
+    expect(headerIdx, 'validator table header not found in packages/validators/README.md').toBeGreaterThan(-1);
     const tableStart = readme.indexOf('\n', headerIdx) + 1;
     const tableEnd = readme.indexOf('\n\n', tableStart);
     const tableBody = readme.slice(tableStart, tableEnd === -1 ? undefined : tableEnd);

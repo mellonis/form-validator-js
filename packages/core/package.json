@@ -1,6 +1,6 @@
 {
   "name": "@form-validator-js/core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Validation engine for form-validator-js — declarative, data-attribute-driven form validation for vanilla TypeScript / JavaScript.",
   "keywords": [
     "form",
