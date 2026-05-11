@@ -37,12 +37,14 @@ Validation is **driven by HTML `data-` attributes**, not by a JS schema:
 - Constructing `FormValidator` sets `novalidate` on the form and attaches listeners for `submit`, `input`, `focusout`, `reset`, and a custom `fvjs:validate` event (defined as the `VALIDATE_EVENT_TYPE` constant at the top of `FormValidator.ts` — single source of truth for the event name; rename there if you ever change it). Both `input` and `focusout` are always attached; gating per trigger mode happens at handler time (see Validation timing below). Inputs trigger validation by dispatching `FormValidator.createValidateEvent()`. Submits with errors are blocked via `stopImmediatePropagation` + `preventDefault` (`#submitEventHandler`). The `stopImmediatePropagation` is **deliberate**: the design contract is that an invalid submit triggers no submit-listener side effects. This holds for submit listeners registered **after** `new FormValidator(...)`; earlier listeners still fire because DOM listener order is registration order on the target. The contract is asserted by two tests in `FormValidator.test.ts` ("listeners registered AFTER…" and "BEFORE…") — don't change the constructor's listener-attach order without updating them.
 - `form=`-linked inputs (controls outside the form's DOM subtree, associated via the `form` attribute) are picked up by iterating `form.elements` (the standard `HTMLFormControlsCollection`). Since events on these don't bubble to the form, the engine attaches per-element `input`, `focusout`, and `validate` listeners and tracks them in `#externalControls` for cleanup.
 
+When a validator's `validate` returns a Promise, the engine routes it through `AsyncValidationCoordinator` instead of pushing the result to the apply pipeline directly. Sync results that supersede in-flight async (e.g. injection, sync return after async) call `coordinator.abortSlot` to tear down the in-flight cleanly.
+
 ### The validator contract
 
 Each validator is a `{ init, validate, errorMessage? }` object:
 
 - `init(targetElement, { argumentString })` must return a `FormValidatorInitResult` with `observableElementList` (which elements should re-trigger validation when they change — e.g. `equalsTo` returns both fields, `checkedCount`/`required` return the whole radio/checkbox group via `document.getElementsByName(name)`) and `extraData` (frozen, passed back to `validate`). `init` may also throw on bad arguments — that propagates out of `addValidators` / `updateValidationParameters`.
-- `validate(targetElement, data)` returns a `FormValidatorValidationResult` with `isValid`, optional `isContextError` (true → error attaches to the context element instead of the field; used for any case where the error logically belongs to a group/section, e.g. radio/checkbox groups, fieldsets, multi-step sections), and optional `validatorSubtypeList` (lets one validator emit multiple distinct error keys — paired with a `{ subtype: message }` map for `errorMessage`).
+- `validate(targetElement, data)` returns a `FormValidatorValidationResult` with `isValid`, optional `isContextError` (true → error attaches to the context element instead of the field; used for any case where the error logically belongs to a group/section, e.g. radio/checkbox groups, fieldsets, multi-step sections), and optional `validatorSubtypeList` (lets one validator emit multiple distinct error keys — paired with a `{ subtype: message }` map for `errorMessage`). `validate` may also return `Promise<FormValidatorValidationResult>`. When async, the third arg `{ signal: AbortSignal }` is provided — wire it into `fetch` and any other awaitable resource. The validator declaration may also include `onError?: (err) => Result` to map non-Abort rejections to a specific result; the default fallback is `{ isValid: false, validatorSubtypeList: ['error'] }`.
 - `errorMessage` may be a string (becomes `{ '': string }`) or a `{ subtype: message }` map. Per-field overrides go through the `elementToSpecificErrorMessageMap` facade exposed on the instance, which has `set(element, msgs)` / `delete(element)` / `clear()`. The facade is a small `ElementErrorMessageFacade` class — when changing this surface, edit it in `FormValidator.ts`, not via `Object.defineProperty`.
 
 ### Observable-element wiring
@@ -69,9 +71,33 @@ The constructor accepts `trigger?: TriggerMode` (default `'blur-then-input'`). `
 
 Submit-time validation in `#submitEventHandler` is independent of trigger and always fires. Adding a future fifth mode is one switch case in `#getEffectiveTrigger` plus a `shouldFire` clause.
 
+### Async validation
+
+`validate` may return a `Promise<FormValidatorValidationResult>`. The engine detects this at runtime via `instanceof Promise` and routes through `AsyncValidationCoordinator` (`packages/core/src/classes/AsyncValidationCoordinator.ts`), which owns:
+
+- `#asyncInFlight: Map<Element, Map<string, { generation, controller }>>` — per (target, validatorName) tracking.
+- `#pendingCount: number` — form-level counter; invariant: equals `sum of inner-Map sizes`. Maintained by mutating only on add/remove, never on replace (see T1).
+
+The state machine has five transitions (T1–T5) detailed in the design spec at `docs/superpowers/specs/2026-05-11-async-validation-design.md`. Key invariants:
+
+- **Race-by-latest:** every cycle has a `generation`; resolves/rejects with stale generation drop silently. This is the only correctness guarantee — works even if user code ignores `AbortSignal`.
+- **Reserved subtype `'error'`:** non-AbortError rejection without a custom `onError` lands as `{ isValid: false, validatorSubtypeList: ['error'] }`. Consumers map `errorMessage: { error: '...' }` to render.
+- **Submit hand-off:** when the form is submit-pending and `pendingCount` hits 0, FormValidator's `#checkSubmitHandoff` runs. If verdict is valid, calls `form.requestSubmit(submitter)` with the `#allowNextSubmit` loop guard set so the resubmit doesn't re-trigger validation.
+- **Reset and destroy abort all in-flight.** Reset fires per-element + form pending-change(false). Destroy is silent (calls `coordinator.abortAllSilent()` — no callbacks during teardown).
+
+`onErrorMessageListChanged` now receives a third arg `errors: ErrorDetail[]`, parallel to `msgs[]`. Detection should key on `(validatorName, subtype)` tuples, not on rendered text. Reserved subtype `'error'` is the synthetic-failure marker.
+
+`aria-busy` is auto-managed on form-control elements while at least one validator is pending (mirrors `aria-invalid` scope; skipped for non-form-controls).
+
+Public API additions: `onPendingChange`, `onFormPendingChange`, `onError` (validator field), `retry(element, validatorName?)` instance method. `validate` third arg `{ signal: AbortSignal }`.
+
+In `'blur-then-input'` mode, while submit is pending, input events fire validation immediately even if no error has been shown yet — necessary so the pending submit resolves against the latest field values.
+
 ### Lifecycle
 
 `formValidator.destroy()` removes all listeners (form-level and per-external-input) and clears internal maps. Idempotent. Behavior of any other method after `destroy()` is undefined. The `novalidate` and `data-validation-context="*"` attributes the constructor set on the form are intentionally left in place — removing them risks clobbering attributes the consumer set independently. Same rationale for any `aria-invalid` attributes the engine has set on form controls.
+
+Both `reset` and `destroy()` abort all in-flight async via `coordinator.abortAll()` / `coordinator.abortAllSilent()`. Reset fires `onPendingChange(false)` per element and `onFormPendingChange(false)`; destroy fires no callbacks (tear-down is invisible to the consumer).
 
 ### Browser integration (Constraint Validation API)
 
