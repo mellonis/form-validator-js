@@ -1,5 +1,5 @@
 import AsyncValidationCoordinator from './AsyncValidationCoordinator';
-import type FormValidatorValidationResult from './FormValidatorValidationResult';
+import FormValidatorValidationResult from './FormValidatorValidationResult';
 
 function makeCoordinator() {
   return new AsyncValidationCoordinator({
@@ -84,5 +84,78 @@ describe('AsyncValidationCoordinator T1 new-slot path', () => {
 
     expect(callbacks.onElementPendingChange).toHaveBeenCalledTimes(2);
     expect(callbacks.onFormPendingChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+async function flushMicrotasks() {
+  // Drain the microtask queue — Promise then-callbacks settle here.
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+describe('AsyncValidationCoordinator T2 resolve', () => {
+  test('resolve applies result and fires not-pending transitions', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const d = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', d.promise, new AbortController());
+
+    const result = new FormValidatorValidationResult({ isValid: true });
+    d.resolve(result);
+    await flushMicrotasks();
+
+    expect(callbacks.onApplyResult).toHaveBeenCalledWith(el, 'x', result);
+    expect(callbacks.onElementPendingChange).toHaveBeenLastCalledWith(el, false);
+    expect(callbacks.onFormPendingChange).toHaveBeenLastCalledWith(false);
+    expect(callbacks.onSlotResolved).toHaveBeenCalledTimes(1);
+    expect(c.hasPending()).toBe(false);
+    expect(c.hasPendingFor(el)).toBe(false);
+  });
+
+  test('onApplyResult fires before pending-change callbacks (consumer sees consistent intermediate state)', async () => {
+    const order: string[] = [];
+    const c = new AsyncValidationCoordinator({
+      onApplyResult: () => order.push('apply'),
+      onElementPendingChange: (_e, p) => order.push(`element:${p}`),
+      onFormPendingChange: (p) => order.push(`form:${p}`),
+      onSlotResolved: () => order.push('resolved'),
+    });
+    const el = document.createElement('input');
+    const d = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', d.promise, new AbortController());
+    order.length = 0; // ignore startup callbacks
+
+    d.resolve(new FormValidatorValidationResult({ isValid: true }));
+    await flushMicrotasks();
+
+    expect(order).toEqual(['apply', 'element:false', 'form:false', 'resolved']);
+  });
+
+  test('resolving one of two slots on same element keeps element pending', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const dA = deferred<FormValidatorValidationResult>();
+    const dB = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'a', dA.promise, new AbortController());
+    c.startCycle(el, 'b', dB.promise, new AbortController());
+
+    dA.resolve(new FormValidatorValidationResult({ isValid: true }));
+    await flushMicrotasks();
+
+    expect(callbacks.onElementPendingChange).toHaveBeenCalledTimes(1); // only the initial true
+    expect(c.hasPendingFor(el)).toBe(true);
+    expect(c.hasPending()).toBe(true);
   });
 });

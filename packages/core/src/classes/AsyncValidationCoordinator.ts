@@ -41,7 +41,7 @@ export default class AsyncValidationCoordinator {
     name: string,
     promise: Promise<FormValidatorValidationResult>,
     controller: AbortController,
-    onError?: (err: unknown) => FormValidatorValidationResult,
+    _onError?: (err: unknown) => FormValidatorValidationResult,
   ): void {
     let inner = this.#asyncInFlight.get(element);
     const previous = inner?.get(name);
@@ -59,14 +59,38 @@ export default class AsyncValidationCoordinator {
     const wasFirstForElement = inner.size === 0;
     const wasFirstForForm = this.#pendingCount === 0;
 
-    inner.set(name, { generation: 0, controller });
+    const generation = 0;
+    inner.set(name, { generation, controller });
     this.#pendingCount += 1;
 
     if (wasFirstForElement) this.#callbacks.onElementPendingChange(element, true);
     if (wasFirstForForm) this.#callbacks.onFormPendingChange(true);
 
-    // Promise hookup is implemented in Task 3 alongside the resolve handler.
-    void promise;
-    void onError;
+    promise.then(
+      (result) => this.#handleResolve(element, name, generation, result),
+      // Reject handler implemented in Task 5; until then, a rejection is silently dropped.
+      (_err) => { /* T3 implemented in Task 5 */ },
+    );
+  }
+
+  #handleResolve(
+    element: Element,
+    name: string,
+    generation: number,
+    result: FormValidatorValidationResult,
+  ): void {
+    const inner = this.#asyncInFlight.get(element);
+    const current = inner?.get(name);
+    if (!inner || !current || current.generation !== generation) return; // stale or cleared
+
+    this.#callbacks.onApplyResult(element, name, result);
+
+    inner.delete(name);
+    if (inner.size === 0) this.#asyncInFlight.delete(element);
+    this.#pendingCount -= 1;
+
+    if (!inner.size) this.#callbacks.onElementPendingChange(element, false);
+    if (this.#pendingCount === 0) this.#callbacks.onFormPendingChange(false);
+    this.#callbacks.onSlotResolved();
   }
 }
