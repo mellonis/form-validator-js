@@ -17,8 +17,6 @@ interface SlotEntry {
 }
 
 export default class AsyncValidationCoordinator {
-  // Stored now; consumed by the resolve/reject/abort methods added in subsequent tasks.
-  // eslint-disable-next-line no-unused-private-class-members
   readonly #callbacks: AsyncValidationCoordinatorCallbacks;
 
   readonly #asyncInFlight = new Map<Element, Map<string, SlotEntry>>();
@@ -36,5 +34,39 @@ export default class AsyncValidationCoordinator {
   hasPendingFor(element: Element): boolean {
     const inner = this.#asyncInFlight.get(element);
     return inner ? inner.size > 0 : false;
+  }
+
+  startCycle(
+    element: Element,
+    name: string,
+    promise: Promise<FormValidatorValidationResult>,
+    controller: AbortController,
+    onError?: (err: unknown) => FormValidatorValidationResult,
+  ): void {
+    let inner = this.#asyncInFlight.get(element);
+    const previous = inner?.get(name);
+
+    if (previous) {
+      // Replace path — implemented in Task 4.
+      return;
+    }
+
+    if (!inner) {
+      inner = new Map();
+      this.#asyncInFlight.set(element, inner);
+    }
+
+    const wasFirstForElement = inner.size === 0;
+    const wasFirstForForm = this.#pendingCount === 0;
+
+    inner.set(name, { generation: 0, controller });
+    this.#pendingCount += 1;
+
+    if (wasFirstForElement) this.#callbacks.onElementPendingChange(element, true);
+    if (wasFirstForForm) this.#callbacks.onFormPendingChange(true);
+
+    // Promise hookup is implemented in Task 3 alongside the resolve handler.
+    void promise;
+    void onError;
   }
 }
