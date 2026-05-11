@@ -1721,6 +1721,27 @@ describe('FormValidator aria-busy management', () => {
     expect(input.getAttribute('aria-busy')).toBe('true');
     expect(fieldset.hasAttribute('aria-busy')).toBe(false);
   });
+
+  test('destroy clears aria-busy on form controls that were pending', () => {
+    document.body.innerHTML = '<form id="ab3"><input name="u" data-validation="a"/></form>';
+    const form27 = document.getElementById('ab3') as HTMLFormElement;
+    const input = form27.querySelector('input')!;
+    const v = new FormValidator({
+      form: form27,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise(() => {}),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(input.getAttribute('aria-busy')).toBe('true');
+
+    v.destroy();
+    expect(input.hasAttribute('aria-busy')).toBe(false);
+  });
 });
 
 describe('FormValidator async submit flow', () => {

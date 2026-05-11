@@ -352,6 +352,11 @@ export default class FormValidator {
     this.#targetElementToStorageMap.clear();
     this.#validatorNameToDefinitionMap.clear();
     this.#specificErrorMessages.clear();
+    // Clear aria-busy on any elements that were pending before aborting,
+    // so callers aren't left with stale "in progress" accessibility state.
+    for (const element of this.#coordinator.pendingElements()) {
+      this.#syncAriaBusy(element, false);
+    }
     // Abort any in-flight async validators silently so their callbacks don't
     // fire after the instance is torn down. Using abortAllSilent (not abortAll)
     // because teardown shouldn't surface pending-state transitions.

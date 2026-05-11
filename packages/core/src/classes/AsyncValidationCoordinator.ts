@@ -36,6 +36,10 @@ export default class AsyncValidationCoordinator {
     return inner ? inner.size > 0 : false;
   }
 
+  pendingElements(): Element[] {
+    return Array.from(this.#asyncInFlight.keys());
+  }
+
   startCycle(
     element: Element,
     name: string,
