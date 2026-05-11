@@ -1943,6 +1943,6 @@ describe('FormValidator.retry', () => {
       },
     });
     const input = form20.querySelector('input')!;
-    expect(() => v.retry(input, 'nonexistent')).toThrowError(/not declared/);
+    expect(() => v.retry(input, 'nonexistent')).toThrow(/not declared/);
   });
 });
