@@ -327,3 +327,28 @@ describe('AsyncValidationCoordinator T1 replace path', () => {
     expect(callbacks.onApplyResult).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('AsyncValidationCoordinator stale generation drops', () => {
+  test('resolve of stale generation drops without apply or counter change', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const dOld = deferred<FormValidatorValidationResult>();
+    const dNew = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', dOld.promise, new AbortController());
+    c.startCycle(el, 'x', dNew.promise, new AbortController()); // bumps generation
+
+    // Old resolves naturally (user ignored signal). Should drop.
+    dOld.resolve(new FormValidatorValidationResult({ isValid: true }));
+    await flushMicrotasks();
+
+    expect(callbacks.onApplyResult).not.toHaveBeenCalled();
+    expect(c.hasPending()).toBe(true);
+    expect(callbacks.onSlotResolved).not.toHaveBeenCalled();
+  });
+});
