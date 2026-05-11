@@ -1,5 +1,6 @@
 import FormValidatorInitResult, { type FormElement } from './FormValidatorInitResult';
 import FormValidatorValidationResult from './FormValidatorValidationResult';
+import AsyncValidationCoordinator from './AsyncValidationCoordinator';
 
 // Namespaced custom event type — chosen to avoid collisions with consumer or
 // third-party listeners that might also use a generic name like 'validate'.
@@ -233,6 +234,12 @@ export default class FormValidator {
 
   readonly #validatorNameToDefinitionMap = new Map<string, ValidatorDefinition>();
 
+  readonly #onPendingChange: (element: Element, isPending: boolean) => void;
+
+  readonly #onFormPendingChange: (isPending: boolean) => void;
+
+  readonly #coordinator: AsyncValidationCoordinator;
+
   constructor({
     form,
     validatorDeclarations = {},
@@ -240,8 +247,8 @@ export default class FormValidator {
     manageValidity = true,
     reportValidityOnSubmit = false,
     trigger = 'blur-then-input',
-    onPendingChange: _onPendingChange = () => {},
-    onFormPendingChange: _onFormPendingChange = () => {},
+    onPendingChange = () => {},
+    onFormPendingChange = () => {},
   }: FormValidatorParams) {
     if (!(form instanceof HTMLFormElement)) {
       throw new Error('form must be an HTMLFormElement');
@@ -252,6 +259,23 @@ export default class FormValidator {
     this.#manageValidity = manageValidity;
     this.#reportValidityOnSubmit = reportValidityOnSubmit;
     this.#trigger = trigger;
+    this.#onPendingChange = onPendingChange;
+    this.#onFormPendingChange = onFormPendingChange;
+    this.#coordinator = new AsyncValidationCoordinator({
+      onApplyResult: (element, _name, result) => {
+        this.#applyResults(element as FormElement, [result]);
+      },
+      onElementPendingChange: (element, isPending) => {
+        this.#syncAriaBusy(element, isPending);
+        this.#onPendingChange(element, isPending);
+      },
+      onFormPendingChange: (isPending) => {
+        this.#onFormPendingChange(isPending);
+      },
+      onSlotResolved: () => {
+        this.#checkSubmitHandoff();
+      },
+    });
     this.#form.setAttribute('novalidate', '');
     this.#form.setAttribute('data-validation-context', '*');
     this.#specificErrorMessagesFacade = new ElementErrorMessageFacade(
@@ -298,6 +322,9 @@ export default class FormValidator {
     this.#targetElementToStorageMap.clear();
     this.#validatorNameToDefinitionMap.clear();
     this.#specificErrorMessages.clear();
+    // Abort any in-flight async validators so their callbacks don't fire after
+    // the instance is torn down (filled out further in Task 17).
+    this.#coordinator.abortAll();
   }
 
   static getElementType(element: Element): ElementType | null {
@@ -782,6 +809,16 @@ export default class FormValidator {
         this.#form.reportValidity();
       }
     }
+  };
+
+  #syncAriaBusy = (element: Element, isPending: boolean): void => {
+    // Filled in Task 15.
+    void element;
+    void isPending;
+  };
+
+  #checkSubmitHandoff = (): void => {
+    // Filled in Task 16.
   };
 
   #validateEventHandler = (event: CustomEvent): void => {

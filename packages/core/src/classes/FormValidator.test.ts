@@ -1501,3 +1501,20 @@ describe('FormValidator #applyResults refactor regression', () => {
     expect(lastCall[1]).toContain('invalid');
   });
 });
+
+describe('FormValidator coordinator wiring', () => {
+  test('constructor accepts onPendingChange and onFormPendingChange without throwing', () => {
+    document.body.innerHTML = '<form id="cw"/>';
+    const form4 = document.getElementById('cw') as HTMLFormElement;
+    const onPending = vi.fn();
+    const onFormPending = vi.fn();
+    expect(() => new FormValidator({
+      form: form4,
+      onPendingChange: onPending,
+      onFormPendingChange: onFormPending,
+    })).not.toThrow();
+    // No async cycles started yet → no callbacks fired.
+    expect(onPending).not.toHaveBeenCalled();
+    expect(onFormPending).not.toHaveBeenCalled();
+  });
+});
