@@ -1,4 +1,4 @@
-import type FormValidatorValidationResult from './FormValidatorValidationResult';
+import FormValidatorValidationResult from './FormValidatorValidationResult';
 
 export interface AsyncValidationCoordinatorCallbacks {
   onApplyResult: (
@@ -41,7 +41,7 @@ export default class AsyncValidationCoordinator {
     name: string,
     promise: Promise<FormValidatorValidationResult>,
     controller: AbortController,
-    _onError?: (err: unknown) => FormValidatorValidationResult,
+    onError?: (err: unknown) => FormValidatorValidationResult,
   ): void {
     let inner = this.#asyncInFlight.get(element);
     const previous = inner?.get(name);
@@ -53,8 +53,7 @@ export default class AsyncValidationCoordinator {
       inner!.set(name, { generation: newGeneration, controller });
       promise.then(
         (result) => this.#handleResolve(element, name, newGeneration, result),
-        // T3 (reject handler) implemented in Task 5; until then, a rejection is silently dropped.
-        (_err) => { /* T3 implemented in Task 5 */ },
+        (err) => this.#handleReject(element, name, newGeneration, err, onError),
       );
       return;
     }
@@ -76,8 +75,7 @@ export default class AsyncValidationCoordinator {
 
     promise.then(
       (result) => this.#handleResolve(element, name, generation, result),
-      // Reject handler implemented in Task 5; until then, a rejection is silently dropped.
-      (_err) => { /* T3 implemented in Task 5 */ },
+      (err) => this.#handleReject(element, name, generation, err, onError),
     );
   }
 
@@ -100,5 +98,43 @@ export default class AsyncValidationCoordinator {
     if (!inner.size) this.#callbacks.onElementPendingChange(element, false);
     if (this.#pendingCount === 0) this.#callbacks.onFormPendingChange(false);
     this.#callbacks.onSlotResolved();
+  }
+
+  #handleReject(
+    element: Element,
+    name: string,
+    generation: number,
+    err: unknown,
+    onError: ((err: unknown) => FormValidatorValidationResult) | undefined,
+  ): void {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      // Drop silently. Counter was never decremented for the replaced/cleared
+      // slot; T1 replace and T4 abortAll handle their own counter math.
+      return;
+    }
+
+    const inner = this.#asyncInFlight.get(element);
+    const current = inner?.get(name);
+    if (!current || current.generation !== generation) return; // stale generation
+
+    let result: FormValidatorValidationResult | undefined;
+    if (onError) {
+      try {
+        const candidate = onError(err);
+        if (candidate instanceof FormValidatorValidationResult) {
+          result = candidate;
+        }
+      } catch {
+        // fall through to default
+      }
+    }
+    if (!result) {
+      result = new FormValidatorValidationResult({
+        isValid: false,
+        validatorSubtypeList: ['error'],
+      });
+    }
+
+    this.#handleResolve(element, name, generation, result);
   }
 }

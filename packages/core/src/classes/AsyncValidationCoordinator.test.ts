@@ -160,6 +160,121 @@ describe('AsyncValidationCoordinator T2 resolve', () => {
   });
 });
 
+describe('AsyncValidationCoordinator T3 reject', () => {
+  test('AbortError after replace drops silently, no double-decrement (counter invariant)', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const dOld = deferred<FormValidatorValidationResult>();
+    const dNew = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', dOld.promise, new AbortController());
+    c.startCycle(el, 'x', dNew.promise, new AbortController());
+
+    // Old promise rejects with AbortError after replace.
+    dOld.reject(new DOMException('Aborted', 'AbortError'));
+    await flushMicrotasks();
+
+    expect(callbacks.onApplyResult).not.toHaveBeenCalled();
+    expect(c.hasPending()).toBe(true); // counter must still be 1, not 0
+
+    dNew.resolve(new FormValidatorValidationResult({ isValid: true }));
+    await flushMicrotasks();
+    expect(c.hasPending()).toBe(false); // counter goes 1 → 0 cleanly
+  });
+
+  test('non-AbortError with no onError manufactures default failure result', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const d = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', d.promise, new AbortController());
+
+    d.reject(new Error('network down'));
+    await flushMicrotasks();
+
+    expect(callbacks.onApplyResult).toHaveBeenCalledTimes(1);
+    const [, , result] = callbacks.onApplyResult.mock.calls[0];
+    expect(result.isValid).toBe(false);
+    expect(result.validatorSubtypeList).toEqual(['error']);
+    expect(c.hasPending()).toBe(false);
+  });
+
+  test('non-AbortError with onError uses its returned result', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const d = deferred<FormValidatorValidationResult>();
+    const customResult = new FormValidatorValidationResult({
+      isValid: false,
+      validatorSubtypeList: ['rateLimited'],
+    });
+    c.startCycle(el, 'x', d.promise, new AbortController(), () => customResult);
+
+    d.reject(new Error('429'));
+    await flushMicrotasks();
+
+    const [, , result] = callbacks.onApplyResult.mock.calls[0];
+    expect(result).toBe(customResult);
+  });
+
+  test('onError that throws falls back to default failure result', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const d = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', d.promise, new AbortController(), () => {
+      throw new Error('onError blew up');
+    });
+
+    d.reject(new Error('original'));
+    await flushMicrotasks();
+
+    const [, , result] = callbacks.onApplyResult.mock.calls[0];
+    expect(result.isValid).toBe(false);
+    expect(result.validatorSubtypeList).toEqual(['error']);
+  });
+
+  test('onError returning non-Result falls back to default failure result', async () => {
+    const callbacks = {
+      onApplyResult: vi.fn(),
+      onElementPendingChange: vi.fn(),
+      onFormPendingChange: vi.fn(),
+      onSlotResolved: vi.fn(),
+    };
+    const c = new AsyncValidationCoordinator(callbacks);
+    const el = document.createElement('input');
+    const d = deferred<FormValidatorValidationResult>();
+    c.startCycle(el, 'x', d.promise, new AbortController(), () => 'not a result' as unknown as FormValidatorValidationResult);
+
+    d.reject(new Error('original'));
+    await flushMicrotasks();
+
+    const [, , result] = callbacks.onApplyResult.mock.calls[0];
+    expect(result.isValid).toBe(false);
+    expect(result.validatorSubtypeList).toEqual(['error']);
+  });
+});
+
 describe('AsyncValidationCoordinator T1 replace path', () => {
   test('startCycle on existing slot aborts previous, bumps generation, no counter change, no callbacks', () => {
     const callbacks = {
