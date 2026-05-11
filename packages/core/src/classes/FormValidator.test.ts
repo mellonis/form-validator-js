@@ -1672,3 +1672,53 @@ describe('FormValidator ErrorDetail third arg', () => {
     }
   });
 });
+
+describe('FormValidator aria-busy management', () => {
+  test('aria-busy set on form control while async pending, removed on resolution', async () => {
+    document.body.innerHTML = '<form id="ab"><input name="u" data-validation="a"/></form>';
+    const form9 = document.getElementById('ab') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    new FormValidator({
+      form: form9,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    const input = form9.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(input.getAttribute('aria-busy')).toBe('true');
+
+    resolveFn(new FormValidatorValidationResult({ isValid: true }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(input.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  test('aria-busy NOT set on non-form-control context element', () => {
+    document.body.innerHTML = `
+      <form id="ab2">
+        <fieldset data-validation-context="a">
+          <input name="u" data-validation="a"/>
+        </fieldset>
+      </form>`;
+    const form10 = document.getElementById('ab2') as HTMLFormElement;
+    new FormValidator({
+      form: form10,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise(() => {}),
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    const input = form10.querySelector('input')!;
+    const fieldset = form10.querySelector('fieldset')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(input.getAttribute('aria-busy')).toBe('true');
+    expect(fieldset.hasAttribute('aria-busy')).toBe(false);
+  });
+});

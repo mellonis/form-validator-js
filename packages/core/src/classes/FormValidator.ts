@@ -830,9 +830,16 @@ export default class FormValidator {
   };
 
   #syncAriaBusy = (element: Element, isPending: boolean): void => {
-    // Filled in Task 15.
-    void element;
-    void isPending;
+    if (!(element instanceof HTMLInputElement
+      || element instanceof HTMLSelectElement
+      || element instanceof HTMLTextAreaElement)) {
+      return; // skip non-form-controls (mirrors aria-invalid scope)
+    }
+    if (isPending) {
+      element.setAttribute('aria-busy', 'true');
+    } else {
+      element.removeAttribute('aria-busy');
+    }
   };
 
   #checkSubmitHandoff = (): void => {
