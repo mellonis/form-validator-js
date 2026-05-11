@@ -1946,3 +1946,38 @@ describe('FormValidator.retry', () => {
     expect(() => v.retry(input, 'nonexistent')).toThrow(/not declared/);
   });
 });
+
+describe('FormValidator ignoreValidationResult + async', () => {
+  test('ignoreValidationResult rewrites async results to valid; submit proceeds', async () => {
+    document.body.innerHTML = '<form id="iva"><input name="u" data-validation="a"/></form>';
+    const form21 = document.getElementById('iva') as HTMLFormElement;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const onChange = vi.fn();
+    const v = new FormValidator({
+      form: form21,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; }),
+          errorMessage: 'invalid',
+        },
+      },
+      onErrorMessageListChanged: onChange,
+    });
+    v.ignoreValidationResult = true;
+    const after = vi.fn();
+    form21.addEventListener('submit', after);
+
+    form21.requestSubmit();
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+
+    // The "invalid" message should NOT have been recorded — rewrite forces isValid=true.
+    const lastCall = onChange.mock.calls.at(-1);
+    if (lastCall) {
+      expect(lastCall[1]).not.toContain('invalid');
+    }
+    // Submit should proceed (downstream listener fires on the resubmit).
+    expect(after).toHaveBeenCalled();
+  });
+});

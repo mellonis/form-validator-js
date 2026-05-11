@@ -207,6 +207,19 @@ function buildErrorDetailList(errorList: ValidationError[]): ErrorDetail[] {
 export default class FormValidator {
   ignoreValidationResult = false;
 
+  #stampAndMaybeIgnore = (
+    r: FormValidatorValidationResult,
+    name: string,
+  ): FormValidatorValidationResult => {
+    r.validatorName = name;
+    if (!this.ignoreValidationResult) return r;
+    return new FormValidatorValidationResult({
+      ...r,
+      validatorSubtypeList: r.validatorSubtypeList,
+      isValid: true,
+    });
+  };
+
   #elementToErrorListMap = new Map<Element, ValidationError[]>();
 
   readonly #specificErrorMessages = new Map<Element, StoredErrorMessages>();
@@ -280,8 +293,7 @@ export default class FormValidator {
     this.#onFormPendingChange = onFormPendingChange;
     this.#coordinator = new AsyncValidationCoordinator({
       onApplyResult: (element, name, result) => {
-        result.validatorName = name;
-        this.#applyResults(element as FormElement, [result]);
+        this.#applyResults(element as FormElement, [this.#stampAndMaybeIgnore(result, name)]);
       },
       onElementPendingChange: (element, isPending) => {
         this.#syncAriaBusy(element, isPending);
@@ -386,16 +398,7 @@ export default class FormValidator {
     }
 
     if (returnValue instanceof FormValidatorValidationResult) {
-      let stamped: FormValidatorValidationResult = returnValue;
-      stamped.validatorName = validatorName;
-      if (this.ignoreValidationResult) {
-        stamped = new FormValidatorValidationResult({
-          ...stamped,
-          validatorSubtypeList: stamped.validatorSubtypeList,
-          isValid: true,
-        });
-      }
-      this.#applyResults(element, [stamped]);
+      this.#applyResults(element, [this.#stampAndMaybeIgnore(returnValue, validatorName)]);
     }
   }
 
@@ -974,19 +977,6 @@ export default class FormValidator {
 
     const validationResultList: FormValidatorValidationResult[] = [];
 
-    const pushResult = (r: FormValidatorValidationResult, name: string): void => {
-      r.validatorName = name;
-      if (this.ignoreValidationResult) {
-        validationResultList.push(new FormValidatorValidationResult({
-          ...r,
-          validatorSubtypeList: r.validatorSubtypeList,
-          isValid: true,
-        }));
-      } else {
-        validationResultList.push(r);
-      }
-    };
-
     for (const validatorName of validatorNameToContextMap.keys()) {
       const data = validatorNameToDataMap.get(validatorName);
       if (!data) continue;
@@ -995,7 +985,7 @@ export default class FormValidator {
       if (injected instanceof FormValidatorValidationResult) {
         // Injection path — abort any in-flight async for this slot first.
         this.#coordinator.abortSlot(targetElement, validatorName);
-        pushResult(injected, validatorName);
+        validationResultList.push(this.#stampAndMaybeIgnore(injected, validatorName));
         continue;
       }
 
@@ -1021,7 +1011,7 @@ export default class FormValidator {
       } else if (returnValue instanceof FormValidatorValidationResult) {
         // Sync result supersedes any in-flight async for this slot.
         this.#coordinator.abortSlot(targetElement, validatorName);
-        pushResult(returnValue, validatorName);
+        validationResultList.push(this.#stampAndMaybeIgnore(returnValue, validatorName));
       }
       // else (undefined / non-Result): silent skip, existing behavior.
     }
