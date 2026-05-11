@@ -1808,3 +1808,73 @@ describe('FormValidator async submit flow', () => {
     expect(counter).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('FormValidator reset and destroy with async', () => {
+  test('reset aborts in-flight async, fires false transitions, clears submit pending', async () => {
+    document.body.innerHTML = '<form id="rd"><input name="u" data-validation="a"/></form>';
+    const form16 = document.getElementById('rd') as HTMLFormElement;
+    let abortedFlag = false;
+    let resolveFn!: (r: FormValidatorValidationResult) => void;
+    const onPending = vi.fn();
+    const onFormPending = vi.fn();
+    new FormValidator({
+      form: form16,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: (_t, _d, opts) => {
+            opts!.signal.addEventListener('abort', () => { abortedFlag = true; });
+            return new Promise<FormValidatorValidationResult>((res) => { resolveFn = res; });
+          },
+          errorMessage: 'invalid',
+        },
+      },
+      onPendingChange: onPending,
+      onFormPendingChange: onFormPending,
+    });
+    const input = form16.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    expect(abortedFlag).toBe(false);
+
+    form16.dispatchEvent(new Event('reset', { bubbles: true }));
+    expect(abortedFlag).toBe(true);
+    expect(onPending).toHaveBeenLastCalledWith(input, false);
+    expect(onFormPending).toHaveBeenLastCalledWith(false);
+
+    // resolveFn (if called now) should not affect anything because slot is gone.
+    resolveFn(new FormValidatorValidationResult({ isValid: false }));
+    await Promise.resolve(); await Promise.resolve();
+  });
+
+  test('destroy aborts in-flight async without firing pending callbacks', async () => {
+    document.body.innerHTML = '<form id="rd2"><input name="u" data-validation="a"/></form>';
+    const form17 = document.getElementById('rd2') as HTMLFormElement;
+    let abortedFlag = false;
+    const onPending = vi.fn();
+    const onFormPending = vi.fn();
+    const v = new FormValidator({
+      form: form17,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: (_t, _d, opts) => {
+            opts!.signal.addEventListener('abort', () => { abortedFlag = true; });
+            return new Promise(() => {});
+          },
+          errorMessage: 'invalid',
+        },
+      },
+      onPendingChange: onPending,
+      onFormPendingChange: onFormPending,
+    });
+    const input = form17.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    onPending.mockClear();
+    onFormPending.mockClear();
+
+    v.destroy();
+    expect(abortedFlag).toBe(true);
+    expect(onPending).not.toHaveBeenCalled();
+    expect(onFormPending).not.toHaveBeenCalled();
+  });
+});

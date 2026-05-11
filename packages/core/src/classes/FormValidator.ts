@@ -340,9 +340,13 @@ export default class FormValidator {
     this.#targetElementToStorageMap.clear();
     this.#validatorNameToDefinitionMap.clear();
     this.#specificErrorMessages.clear();
-    // Abort any in-flight async validators so their callbacks don't fire after
-    // the instance is torn down (filled out further in Task 17).
-    this.#coordinator.abortAll();
+    // Abort any in-flight async validators silently so their callbacks don't
+    // fire after the instance is torn down. Using abortAllSilent (not abortAll)
+    // because teardown shouldn't surface pending-state transitions.
+    this.#coordinator.abortAllSilent();
+    this.#submitPending = false;
+    this.#submitSubmitter = null;
+    this.#allowNextSubmit = false;
   }
 
   static getElementType(element: Element): ElementType | null {
@@ -807,6 +811,10 @@ export default class FormValidator {
 
   #resetEventHandler = (event: Event): void => {
     if (event.target === this.#form) {
+      this.#coordinator.abortAll();
+      this.#submitPending = false;
+      this.#submitSubmitter = null;
+      this.#allowNextSubmit = false;
       for (const element of this.#elementToErrorListMap.keys()) {
         this.#elementToErrorListMap.set(element, []);
         this.#clearAriaInvalid(element);

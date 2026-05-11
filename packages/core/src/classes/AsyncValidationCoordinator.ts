@@ -136,6 +136,18 @@ export default class AsyncValidationCoordinator {
     this.#callbacks.onFormPendingChange(false);
   }
 
+  abortAllSilent(): void {
+    if (this.#pendingCount === 0) return;
+    for (const inner of this.#asyncInFlight.values()) {
+      for (const { controller } of inner.values()) {
+        controller.abort();
+      }
+    }
+    this.#asyncInFlight.clear();
+    this.#pendingCount = 0;
+    // No callbacks — caller is doing teardown.
+  }
+
   #handleReject(
     element: Element,
     name: string,

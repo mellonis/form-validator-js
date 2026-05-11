@@ -371,3 +371,29 @@ describe('AsyncValidationCoordinator abortAll', () => {
     expect(callbacks.onApplyResult).not.toHaveBeenCalled();
   });
 });
+
+describe('AsyncValidationCoordinator abortAllSilent', () => {
+  test('aborts every controller, clears state, fires NO callbacks', () => {
+    const { c, callbacks } = makeCoordinator();
+    const el = document.createElement('input');
+    const ctrl = new AbortController();
+    c.startCycle(el, 'x', deferred<FormValidatorValidationResult>().promise, ctrl);
+    callbacks.onElementPendingChange.mockClear();
+    callbacks.onFormPendingChange.mockClear();
+
+    c.abortAllSilent();
+
+    expect(ctrl.signal.aborted).toBe(true);
+    expect(c.hasPending()).toBe(false);
+    expect(callbacks.onElementPendingChange).not.toHaveBeenCalled();
+    expect(callbacks.onFormPendingChange).not.toHaveBeenCalled();
+    expect(callbacks.onSlotResolved).not.toHaveBeenCalled();
+  });
+
+  test('abortAllSilent on empty coordinator is a no-op', () => {
+    const { c, callbacks } = makeCoordinator();
+    expect(() => c.abortAllSilent()).not.toThrow();
+    expect(callbacks.onElementPendingChange).not.toHaveBeenCalled();
+    expect(callbacks.onFormPendingChange).not.toHaveBeenCalled();
+  });
+});
