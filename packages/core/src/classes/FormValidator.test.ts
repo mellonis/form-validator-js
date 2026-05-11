@@ -1878,3 +1878,71 @@ describe('FormValidator reset and destroy with async', () => {
     expect(onFormPending).not.toHaveBeenCalled();
   });
 });
+
+describe('FormValidator.retry', () => {
+  test('retry(el) re-runs all validators (equivalent to dispatching createValidateEvent)', () => {
+    document.body.innerHTML = '<form id="rt"><input name="u" data-validation="a"/></form>';
+    const form18 = document.getElementById('rt') as HTMLFormElement;
+    const validate = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const v = new FormValidator({
+      form: form18,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate,
+          errorMessage: 'invalid',
+        },
+      },
+    });
+    const input = form18.querySelector('input')!;
+    validate.mockClear();
+    v.retry(input);
+    expect(validate).toHaveBeenCalled();
+  });
+
+  test('retry(el, name) granular: re-runs only the named validator, leaves other slots untouched', () => {
+    document.body.innerHTML = '<form id="rt2"><input name="u" data-validation="a;b"/></form>';
+    const form19 = document.getElementById('rt2') as HTMLFormElement;
+    const validateA = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const validateB = vi.fn(() => new FormValidatorValidationResult({ isValid: true }));
+    const v = new FormValidator({
+      form: form19,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: validateA,
+          errorMessage: 'a',
+        },
+        b: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: validateB,
+          errorMessage: 'b',
+        },
+      },
+    });
+    const input = form19.querySelector('input')!;
+    input.dispatchEvent(FormValidator.createValidateEvent());
+    validateA.mockClear();
+    validateB.mockClear();
+    v.retry(input, 'a');
+    expect(validateA).toHaveBeenCalledTimes(1);
+    expect(validateB).not.toHaveBeenCalled();
+  });
+
+  test('retry(el, name) throws when validator name is not declared on the element', () => {
+    document.body.innerHTML = '<form id="rt3"><input name="u" data-validation="a"/></form>';
+    const form20 = document.getElementById('rt3') as HTMLFormElement;
+    const v = new FormValidator({
+      form: form20,
+      validatorDeclarations: {
+        a: {
+          init: () => new FormValidatorInitResult({ observableElementList: [], extraData: {} }),
+          validate: () => new FormValidatorValidationResult({ isValid: true }),
+          errorMessage: 'a',
+        },
+      },
+    });
+    const input = form20.querySelector('input')!;
+    expect(() => v.retry(input, 'nonexistent')).toThrowError(/not declared/);
+  });
+});

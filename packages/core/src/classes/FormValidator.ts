@@ -349,6 +349,56 @@ export default class FormValidator {
     this.#allowNextSubmit = false;
   }
 
+  retry(element: Element, validatorName?: string): void {
+    if (validatorName === undefined) {
+      element.dispatchEvent(FormValidator.createValidateEvent());
+      return;
+    }
+
+    if (!(element instanceof HTMLInputElement
+      || element instanceof HTMLSelectElement
+      || element instanceof HTMLTextAreaElement)) {
+      throw new Error('Element is not a known validation target');
+    }
+
+    const { validatorNameToContextMap, validatorNameToDataMap } = this.#getData(element);
+
+    if (!validatorNameToContextMap.has(validatorName)) {
+      throw new Error(`Validator "${validatorName}" is not declared on the given element`);
+    }
+
+    const definition = this.#validatorNameToDefinitionMap.get(validatorName);
+    if (!definition) {
+      throw new Error(`Validator "${validatorName}" has no registered definition`);
+    }
+
+    const data = validatorNameToDataMap.get(validatorName);
+    if (!data) return;
+
+    this.#coordinator.abortSlot(element, validatorName);
+
+    const controller = new AbortController();
+    const returnValue = definition.validate(element, data, { signal: controller.signal });
+
+    if (returnValue instanceof Promise) {
+      this.#coordinator.startCycle(element, validatorName, returnValue, controller, definition.onError);
+      return;
+    }
+
+    if (returnValue instanceof FormValidatorValidationResult) {
+      let stamped: FormValidatorValidationResult = returnValue;
+      stamped.validatorName = validatorName;
+      if (this.ignoreValidationResult) {
+        stamped = new FormValidatorValidationResult({
+          ...stamped,
+          validatorSubtypeList: stamped.validatorSubtypeList,
+          isValid: true,
+        });
+      }
+      this.#applyResults(element, [stamped]);
+    }
+  }
+
   static getElementType(element: Element): ElementType | null {
     const tagName = element.tagName.toLowerCase();
 
