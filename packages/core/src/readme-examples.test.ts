@@ -326,3 +326,110 @@ describe('README async-validation snippets', () => {
     expect(lastCall[1]).toContain('invalid');
   });
 });
+
+describe('README: validation contexts', () => {
+  test('isContextError attaches the error to the fieldset, not the checkbox', () => {
+    document.body.innerHTML = `
+      <form id="f">
+        <fieldset id="opts-fs" data-validation-context="atLeastOneChecked">
+          <input type="checkbox" name="opts" value="a" data-validation="atLeastOneChecked">
+          <input type="checkbox" name="opts" value="b">
+          <input type="checkbox" name="opts" value="c">
+        </fieldset>
+        <button>Submit</button>
+      </form>
+    `;
+    const form = document.getElementById('f') as HTMLFormElement;
+    const fieldset = document.getElementById('opts-fs') as HTMLFieldSetElement;
+
+    const atLeastOneChecked: ValidatorDeclaration = {
+      init: (target) => {
+        const name = (target as HTMLInputElement).name;
+        return new FormValidatorInitResult({
+          observableElementList: Array.from(document.getElementsByName(name)),
+        });
+      },
+      validate: (target) => {
+        const name = (target as HTMLInputElement).name;
+        const checked = Array.from(document.getElementsByName(name))
+          .filter((el) => (el as HTMLInputElement).checked).length;
+        return new FormValidatorValidationResult({
+          isValid: checked >= 1,
+          isContextError: true,
+        });
+      },
+      errorMessage: 'Pick at least one.',
+    };
+
+    const errorTargets: Element[] = [];
+    new FormValidator({
+      form,
+      validatorDeclarations: { atLeastOneChecked },
+      onErrorMessageListChanged: (el, msgs) => {
+        if (msgs.length > 0) errorTargets.push(el);
+      },
+    });
+
+    // Submit with nothing checked → error attaches to the fieldset.
+    const submitted = new Event('submit', { cancelable: true, bubbles: true });
+    form.dispatchEvent(submitted);
+    expect(submitted.defaultPrevented).toBe(true);
+    expect(errorTargets).toContain(fieldset);
+  });
+});
+
+describe('README: per-field error message overrides', () => {
+  test('set, delete, clear cycle works against a custom validator', () => {
+    document.body.innerHTML = `
+      <form id="f">
+        <input id="username" name="username" data-validation="noWhitespace">
+        <button>Submit</button>
+      </form>
+    `;
+    const form = document.getElementById('f') as HTMLFormElement;
+    const username = document.getElementById('username') as HTMLInputElement;
+
+    const noWhitespace: ValidatorDeclaration = {
+      init: (target) => new FormValidatorInitResult({ observableElementList: [target] }),
+      validate: (target) => new FormValidatorValidationResult({
+        isValid: !/\s/.test((target as HTMLInputElement).value),
+      }),
+      errorMessage: 'Cannot contain whitespace.',
+    };
+
+    const messagesByElement = new Map<Element, string[]>();
+    const validator = new FormValidator({
+      form,
+      validatorDeclarations: { noWhitespace },
+      onErrorMessageListChanged: (el, msgs) => {
+        messagesByElement.set(el, [...msgs]);
+      },
+    });
+
+    // Trigger an error to see the default message.
+    username.value = 'has space';
+    username.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    expect(messagesByElement.get(username)).toEqual(['Cannot contain whitespace.']);
+
+    // Override the message for this specific field.
+    validator.elementToSpecificErrorMessageMap.set(username, {
+      noWhitespace: 'Usernames cannot contain whitespace.',
+    });
+    username.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(messagesByElement.get(username)).toEqual(['Usernames cannot contain whitespace.']);
+
+    // Delete the override → fall back to the default message.
+    validator.elementToSpecificErrorMessageMap.delete(username);
+    username.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(messagesByElement.get(username)).toEqual(['Cannot contain whitespace.']);
+
+    // Set then clear all overrides.
+    validator.elementToSpecificErrorMessageMap.set(username, { noWhitespace: 'X' });
+    username.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(messagesByElement.get(username)).toEqual(['X']);
+    validator.elementToSpecificErrorMessageMap.clear();
+    username.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(messagesByElement.get(username)).toEqual(['Cannot contain whitespace.']);
+  });
+});
